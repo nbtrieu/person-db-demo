@@ -26,6 +26,6 @@ async def read_root():
 @app.on_event("startup")
 async def app_startup():
     # Async operations that should be run when the app starts
-    g = database_connection.init_gremlin_client()
-    # g = database_connection.get_gremlin_client()
+    # g = database_connection.init_gremlin_client()
+    g = database_connection.get_gremlin_client()
 

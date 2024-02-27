@@ -1,8 +1,8 @@
-# put in /scripts
 # %%
-from typing import List
 import pandas as pd
-import database
+from typing import List
+from tqdm import tqdm
+
 from gremlin_python.process.graph_traversal import GraphTraversalSource, __
 from gremlin_python.process.traversal import (
     Barrier,
@@ -18,9 +18,3 @@ from gremlin_python.process.traversal import (
     T,
     WithOptions,
 )
-from tqdm import tqdm
-from database import BulkQueryExecutor
-# from data_objects import CpG, Factor, Microbe, Disease
-
-
-
