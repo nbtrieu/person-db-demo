@@ -39,3 +39,8 @@ def check_node_properties(g: GraphTraversalSource, label: str, property_key: str
         .toList()
     )
     return properties
+
+
+# %%
+def add_people(g: GraphTraversalSource, person_df: pd.DataFrame):
+    pass

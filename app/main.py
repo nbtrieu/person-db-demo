@@ -38,3 +38,9 @@ async def app_startup():
     )
     print('NODE COUNT:', node_count)
     print('NODE PROPERTIES:', node_properties)
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    database_connection.close_gremlin_client()
+
