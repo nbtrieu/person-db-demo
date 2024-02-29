@@ -1,8 +1,12 @@
 # %%
-from typing import List
 import pandas as pd
 import database
+import ssl
+from gremlin_python.driver.client import Client
 from gremlin_python.process.graph_traversal import GraphTraversalSource, __
+from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
+from gremlin_python.structure.graph import Graph
+from gremlin_python.process.anonymous_traversal import traversal
 from gremlin_python.process.traversal import (
     Barrier,
     Bindings,
@@ -21,6 +25,20 @@ from tqdm import tqdm
 from database import BulkQueryExecutor
 from data_objects import Person, Organization
 
+import nest_asyncio
+nest_asyncio.apply()
+
+# Path to the exported server certificate
+cert_path = '/Users/nicoletrieu/server-cert.pem'
+
+# Create an SSL context that trusts the server's certificate
+ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+ssl_context.load_verify_locations(cert_path)
+
+# Use the SSL context in the DriverRemoteConnection
+connection = DriverRemoteConnection('wss://localhost:8182/gremlin', 'g', ssl_context=ssl_context)
+g = Graph().traversal().withRemote(connection)
+
 
 # %%
 def count_nodes_in_db(g: GraphTraversalSource, label: str):
@@ -28,7 +46,6 @@ def count_nodes_in_db(g: GraphTraversalSource, label: str):
     return node_count
 
 
-# %%
 def check_node_properties(g: GraphTraversalSource, label: str, property_key: str, property_value: str):
     properties = (
         g.V()
@@ -42,12 +59,11 @@ def check_node_properties(g: GraphTraversalSource, label: str, property_key: str
     return properties
 
 
-# %%
 def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
-        contact_df.iterrows,
+        contact_df.iterrows(),
         total=contact_df.shape[0],
         desc="Importing People"
     ):
@@ -61,7 +77,7 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
             Person.PropertyKey.TITLE: row.get("Title", None),
             Person.PropertyKey.INTEREST_AREAS: row.get("Areas of Interests", None),
             Person.PropertyKey.LEAD_SOURCE: row.get("Lead Source", None),
-            Person.PropertyKey.EVENT_NAME: row.get("Event Name", None)
+            Person.PropertyKey.EVENT_NAME: row.get("Event Name", None),
             ** ({Person.PropertyKey.MAILING_ADDRESS: row["Lead's Mailing Address"]} if "Lead's Mailing Address" in contact_df.columns and not pd.isnull(row.get("Lead's Mailing Address")) else {})
         }
 
@@ -91,7 +107,7 @@ def add_organization(g: GraphTraversalSource, contact_df: pd.DataFrame):
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
-        contact_df.iterrows,
+        contact_df.iterrows(),
         total=contact_df.shape[0],
         desc="Importing Organization"
     ):
@@ -101,8 +117,9 @@ def add_organization(g: GraphTraversalSource, contact_df: pd.DataFrame):
         else:
             domain_value = None
             acronym_value = None
-        
-        organization_name_value = row["Organization"].lower().capitalize()
+
+        if pd.notnull(row["Organization"]):
+            organization_name_value = row["Organization"].lower().capitalize()
 
         organization_properties = {
             Organization.PropertyKey.UID: organization_name_value,
@@ -160,3 +177,12 @@ def add_edges_person_organization(
 
 # %%
 contact_df = pd.read_csv("data/2019-2023_Leads_List_Test.csv")
+
+# %%
+person_id_dict = add_people(g, contact_df)
+
+# %%
+organization_id_dict = add_organization(g, contact_df)
+
+# %%
+add_edges_person_organization(g, contact_df, person_id_dict, organization_id_dict)
