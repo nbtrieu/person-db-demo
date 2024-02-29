@@ -40,7 +40,7 @@ connection = DriverRemoteConnection('wss://localhost:8182/gremlin', 'g', ssl_con
 g = Graph().traversal().withRemote(connection)
 
 
-# %%
+# %% IMPORTING DATA:
 def count_nodes_in_db(g: GraphTraversalSource, label: str):
     node_count = g.V().hasLabel(label).count().next()
     return node_count
@@ -119,7 +119,11 @@ def add_organization(g: GraphTraversalSource, contact_df: pd.DataFrame):
             acronym_value = None
 
         if pd.notnull(row["Organization"]):
-            organization_name_value = row["Organization"].lower().capitalize()
+            organization_name_value = row["Organization"].strip().lower().capitalize()
+        else:
+            organization_name_value = "N/A"
+
+        # organization_name_value = row.get("Organization", "N/A").strip().lower().capitalize()  # Normalize the organization name
 
         organization_properties = {
             Organization.PropertyKey.UID: organization_name_value,
@@ -165,7 +169,7 @@ def add_edges_person_organization(
         desc="Adding edges"
     ):
         person_uid_value = row["Email"] if pd.notnull(row["Email"]) else "_".join([row["Full Name"], row["Organization"]]).replace(" ", "_").lower()
-        organization_uid_value = row["Organization"].lower().capitalize()
+        organization_uid_value = row["Email"].split("@")[-1].lower()
 
         person_graph_id = person_id_dict.get(person_uid_value)
         organization_graph_id = organization_id_dict.get(organization_uid_value)
@@ -186,3 +190,18 @@ organization_id_dict = add_organization(g, contact_df)
 
 # %%
 add_edges_person_organization(g, contact_df, person_id_dict, organization_id_dict)
+
+
+# %% QUERYING DATA:
+g.V().drop().iterate()
+
+# %%
+g.V().count().next()
+
+# %%
+check_node_properties(g, "person", "name", "Chris Bentsen")
+
+# %%
+check_node_properties(g, "organization", "name", "Sml genetree co. ltd")
+
+# %%
