@@ -75,7 +75,7 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
             Person.PropertyKey.EMAIL: row.get("Email", None),
             Person.PropertyKey.PHONE: row.get("Phone", None),
             Person.PropertyKey.TITLE: row.get("Title", None),
-            Person.PropertyKey.INTEREST_AREAS: row.get("Areas of Interests", None),
+            Person.PropertyKey.INTEREST_AREAS: row.get("Area of Interests", None),
             Person.PropertyKey.LEAD_SOURCE: row.get("Lead Source", None),
             Person.PropertyKey.EVENT_NAME: row.get("Event Name", None),
             ** ({Person.PropertyKey.MAILING_ADDRESS: row["Lead's Mailing Address"]} if "Lead's Mailing Address" in contact_df.columns and not pd.isnull(row.get("Lead's Mailing Address")) else {})
@@ -103,34 +103,34 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
     return person_id_dict
 
 
-def add_organization(g: GraphTraversalSource, contact_df: pd.DataFrame):
+def add_organization(g: GraphTraversalSource, organization_df: pd.DataFrame):
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
-        contact_df.iterrows(),
-        total=contact_df.shape[0],
+        organization_df.iterrows(),
+        total=organization_df.shape[0],
         desc="Importing Organization"
     ):
-        if pd.notnull(row["Email"]):
-            domain_value = row["Email"].split("@")[-1].lower()
-            acronym_value = domain_value.split(".")[0]
-        else:
-            domain_value = None
-            acronym_value = None
+        # if pd.notnull(row["Email"]):
+        #     domain_value = row["Email"].split("@")[-1].lower()
+        #     acronym_value = domain_value.split(".")[0]
+        # else:
+        #     domain_value = None
+        #     acronym_value = None
 
-        if pd.notnull(row["Organization"]):
-            organization_name_value = row["Organization"].strip().lower().capitalize()
-        else:
-            organization_name_value = "N/A"
+        # if pd.notnull(row["Organization"]):
+        #     organization_name_value = row["Organization"].strip().lower().capitalize()
+        # else:
+        #     organization_name_value = "N/A"
 
-        # organization_name_value = row.get("Organization", "N/A").strip().lower().capitalize()  # Normalize the organization name
+        organization_name_value = row.get("Organization").strip().lower().capitalize()  # Normalize the organization name
 
         organization_properties = {
             Organization.PropertyKey.UID: organization_name_value,
             Organization.PropertyKey.NAME: organization_name_value,
-            Organization.PropertyKey.DOMAIN: domain_value,
-            Organization.PropertyKey.ACRONYM: acronym_value,
-            ** ({Organization.PropertyKey.MAILING_ADDRESS: row["Organization's Mailing Address"]} if "Organization's Mailing Address" in contact_df.columns and not pd.isnull(row.get("Organization's Mailing Address")) else {})
+            # Organization.PropertyKey.DOMAIN: domain_value,
+            # Organization.PropertyKey.ACRONYM: acronym_value,
+            ** ({Organization.PropertyKey.MAILING_ADDRESS: row["Organization's Mailing Address"]} if "Organization's Mailing Address" in organization_df.columns and not pd.isnull(row.get("Organization's Mailing Address")) else {})
         }
 
         query_executor.add_vertex(
@@ -157,19 +157,19 @@ def add_organization(g: GraphTraversalSource, contact_df: pd.DataFrame):
 
 def add_edges_person_organization(
     g: GraphTraversalSource,
-    contact_df: pd.DataFrame,
+    cleaned_df: pd.DataFrame,
     person_id_dict: dict,
     organization_id_dict: dict
 ):
     query_executor = BulkQueryExecutor(g, 100)
 
     for _, row in tqdm(
-        contact_df.iterrows(),
-        total=contact_df.shape[0],
+        cleaned_df.iterrows(),
+        total=cleaned_df.shape[0],
         desc="Adding edges"
     ):
         person_uid_value = row["Email"] if pd.notnull(row["Email"]) else "_".join([row["Full Name"], row["Organization"]]).replace(" ", "_").lower()
-        organization_uid_value = row["Email"].split("@")[-1].lower()
+        organization_uid_value = row.get("Organization").strip().lower().capitalize()
 
         person_graph_id = person_id_dict.get(person_uid_value)
         organization_graph_id = organization_id_dict.get(organization_uid_value)
@@ -183,25 +183,40 @@ def add_edges_person_organization(
 contact_df = pd.read_csv("data/2019-2023_Leads_List_Test.csv")
 
 # %%
+contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
+
+# Remove duplicates and drop rows with missing 'Organization' values
+unique_organizations_df = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
+
+# Convert to a DataFrame to be consistent with your request for a new df
+unique_organizations_df = unique_organizations_df.to_frame()
+
+# Display the DataFrame with unique organization names
+print(unique_organizations_df)
+
+# %%
+cleaned_df = contact_df.dropna(subset=['Organization']).reset_index(drop=True)
+print(cleaned_df)
+
+# %%
 person_id_dict = add_people(g, contact_df)
 
 # %%
-organization_id_dict = add_organization(g, contact_df)
+organization_id_dict = add_organization(g, unique_organizations_df)
 
 # %%
-add_edges_person_organization(g, contact_df, person_id_dict, organization_id_dict)
+add_edges_person_organization(g, cleaned_df, person_id_dict, organization_id_dict)
 
-
-# %% QUERYING DATA:
-g.V().drop().iterate()
+# %% TESTING NODES:
+# g.V().drop().iterate()
 
 # %%
 g.V().count().next()
 
 # %%
-check_node_properties(g, "person", "name", "Chris Bentsen")
+check_node_properties(g, "person", "name", "Baback Gharizadeh")
 
 # %%
-check_node_properties(g, "organization", "name", "Sml genetree co. ltd")
+check_node_properties(g, "organization", "name", "Truepill")
 
-# %%
+# %% QUERYING DATA:

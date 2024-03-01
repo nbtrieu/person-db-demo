@@ -5,6 +5,6 @@ class Organization:
     class PropertyKey:
         UID = "uid"
         NAME = "name"
-        DOMAIN = "domain"
-        ACRONYM = "acronym"
+        # DOMAIN = "domain"
+        # ACRONYM = "acronym"
         MAILING_ADDRESS = "mailing_address"
