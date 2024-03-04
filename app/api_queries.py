@@ -5,8 +5,12 @@ import json
 import pandas as pd
 import os
 from tqdm import tqdm
-from app.database import BulkApiCaller
+from database.bulk_api_caller import BulkApiCaller
 
+# %%
+# print(os.getcwd())
+
+# %%
 with open('config.json', 'r') as file:
     config = json.load(file)
 google_maps_places_api_key = config['apiKeys']['googleMapsPlaces']
@@ -71,9 +75,9 @@ def filter_best_match(result_list: list, place_name: str):
     return best_match
 
 
-def get_organization_address(organizations_df: pd.DataFrame, api_key: str):
-    bulk_api_caller = BulkApiCaller(api_key=api_key, batch_size=5)
-
+def get_organization_address(
+    organizations_df: pd.DataFrame, api_key: str, file_path: str
+):
     all_results = []
     organization_names_list = organizations_df["Organization"].tolist()
 
@@ -125,6 +129,55 @@ def get_organization_address(organizations_df: pd.DataFrame, api_key: str):
     return results_df
 
 
+def get_organization_address_bulk(
+    organizations_df: pd.DataFrame, api_key: str, file_path: str
+):
+    bulk_api_caller = BulkApiCaller(api_key=api_key, batch_size=5)
+
+    organization_names_list = organizations_df["Organization"].tolist()
+    batch_results = bulk_api_caller.search_places_batch(organization_names_list)
+
+    all_results = []
+    for result in batch_results:
+        organization_name = result["organization_name"]
+        search_result = result["result"]
+
+        # Initialize default values
+        result_dict = {
+            "organization_name": organization_name,
+            "address": None,
+            "display_name": None
+        }
+
+        if search_result.get("error"):
+            print(search_result.get("message"))
+        else:
+            result_list = search_result.get("places", [])
+            if result_list:
+                # Assuming filter_best_match returns the best match from result_list
+                best_match = filter_best_match(result_list, organization_name)
+                if best_match:
+                    # If a best match is found, update address and display_name in result_dict
+                    result_dict["display_name"] = best_match["displayName"]["text"]
+                    result_dict["address"] = best_match["formattedAddress"]
+
+        all_results.append(result_dict)
+
+    # Convert all results into a DataFrame
+    results_df = pd.DataFrame(all_results)
+    # Specify the columns to include in the CSV
+    results_df.to_csv(
+        file_path,
+        sep=',',
+        columns=['organization_name', 'display_name', 'address'],
+        header=True,
+        index=False,
+        encoding='utf-8'
+    )
+
+    return results_df
+
+
 # %%
 contact_df = pd.read_csv("data/2019-2023_Leads_List_Test_deduped.csv")
 
@@ -149,13 +202,20 @@ sample_addresses = get_organization_address(small_sample_df, google_maps_places_
 print(sample_addresses)
 
 # %%
+sample_bulk_addresses = get_organization_address_bulk(small_sample_df, google_maps_places_api_key, file_path)
+print(sample_bulk_addresses)
+
+# %%
 sample_search = search_place("Raksan Investors", google_maps_places_api_key)
 print(sample_search)
 
 # %%
-test_addresses = get_organization_address(unique_organizations_df, google_maps_places_api_key)
+test_addresses = get_organization_address(unique_organizations_df, google_maps_places_api_key, file_path)
 print(test_addresses)
 
 # %%
 bulk_api_caller = BulkApiCaller(api_key=google_maps_places_api_key, batch_size=5)
 results = bulk_api_caller.search_places_batch(sample_list)
+print(results)
+
+# %%

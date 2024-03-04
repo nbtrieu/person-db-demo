@@ -37,22 +37,15 @@ class BulkApiCaller:
         return {"error": True, "status_code": response.status_code if response else 'N/A', "message": response.text if response else 'No response'}
 
     def search_places_batch(self, places):
-        """Perform batch search for places using concurrent API calls."""
         all_results = []
 
-        # Function to make API call for each place
         def make_api_call(place):
-            return self.search_place(place)
+            result = self.search_place(place)
+            return {"organization_name": place, "result": result}
 
         with ThreadPoolExecutor(max_workers=self.batch_size) as executor:
-            future_to_place = {executor.submit(make_api_call, place): place for place in places}
-
-            for future in as_completed(future_to_place):
-                place = future_to_place[future]
-                try:
-                    data = future.result()
-                    all_results.append(data)
-                except Exception as e:
-                    logging.error(f"Error processing place {place}: {e}")
+            futures = [executor.submit(make_api_call, place) for place in places]
+            for future in as_completed(futures):
+                all_results.append(future.result())
 
         return all_results
