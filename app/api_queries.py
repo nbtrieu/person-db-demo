@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import os
 from tqdm import tqdm
-from app.database import BulkApiCaller
+from database import BulkApiCaller
 
 with open('config.json', 'r') as file:
     config = json.load(file)
@@ -72,7 +72,7 @@ def filter_best_match(result_list: list, place_name: str):
 
 
 def get_organization_address(organizations_df: pd.DataFrame, api_key: str):
-    query_executor = BulkQueryExecutor()
+    bulk_api_caller = BulkApiCaller(api_key=api_key, batch_size=5)
 
     all_results = []
     organization_names_list = organizations_df["Organization"].tolist()
@@ -141,6 +141,10 @@ small_sample_df = unique_organizations_df.sample(n=10, random_state=1)
 print("small_sample_df:\n", small_sample_df)
 
 # %%
+sample_list = small_sample_df["Organization"].tolist()
+print(sample_list)
+
+# %%
 sample_addresses = get_organization_address(small_sample_df, google_maps_places_api_key)
 print(sample_addresses)
 
@@ -153,3 +157,5 @@ test_addresses = get_organization_address(unique_organizations_df, google_maps_p
 print(test_addresses)
 
 # %%
+bulk_api_caller = BulkApiCaller(api_key=google_maps_places_api_key, batch_size=5)
+results = bulk_api_caller.search_places_batch(sample_list)
