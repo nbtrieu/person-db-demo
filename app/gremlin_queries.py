@@ -186,17 +186,17 @@ contact_df = pd.read_csv("data/2019-2023_Leads_List_Test_deduped.csv")
 contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
 
 # Remove duplicates and drop rows with missing 'Organization' values
-unique_organizations_df = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
+unique_organizations_series = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
 
-# Convert to a DataFrame to be consistent with your request for a new df
-unique_organizations_df = unique_organizations_df.to_frame()
+# Convert Pandas Series to DataFrame
+unique_organizations_df = unique_organizations_series.to_frame()
 
 # Display the DataFrame with unique organization names
-print(unique_organizations_df)
+print("unique_organizations_df:\n", unique_organizations_df)
 
 # %% DataFrame containing organization names for the purpose of edge creation between "person" and "organization" nodes:
 cleaned_contact_df = contact_df.dropna(subset=['Organization']).reset_index(drop=True)
-print(cleaned_contact_df)
+print("cleaned_contact_df:\n", cleaned_contact_df)
 
 # %%
 person_id_dict = add_people(g, contact_df)

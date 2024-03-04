@@ -1,3 +1,4 @@
+# %%
 import requests
 import logging
 import json
@@ -9,6 +10,7 @@ with open('config.json', 'r') as file:
 google_maps_places_api_key = config['apiKeys']['googleMapsPlaces']
 
 
+# %%
 def search_place(place, api_key):
     url = 'https://places.googleapis.com/v1/places:searchText'
     payload = {"textQuery": f"address for {place}"}
@@ -59,9 +61,9 @@ def filter_best_match(result_list: list, place_name: str):
     return best_match
 
 
-def get_organization_address(unique_organizations_df: pd.DataFrame, api_key: str):
+def get_organization_address(organizations_df: pd.DataFrame, api_key: str):
     all_results = []
-    organization_names_list = unique_organizations_df["Organization"].tolist()
+    organization_names_list = organizations_df["Organization"].tolist()
 
     for organization_name in tqdm(
         organization_names_list,
@@ -95,3 +97,25 @@ def get_organization_address(unique_organizations_df: pd.DataFrame, api_key: str
         all_results.extend(organization_results)
 
     return all_results
+
+
+# %%
+contact_df = pd.read_csv("data/2019-2023_Leads_List_Test_deduped.csv")
+
+contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
+
+# Remove duplicates and drop rows with missing 'Organization' values
+unique_organizations_series = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
+# Convert Pandas Series to DataFrame
+unique_organizations_df = unique_organizations_series.to_frame()
+print("unique_organizations_df:\n", unique_organizations_df)
+
+# %%
+small_sample_df = unique_organizations_df.sample(n=10, random_state=1)
+print("small_sample_df:\n", small_sample_df)
+
+# %%
+sample_addresses = get_organization_address(small_sample_df, google_maps_places_api_key)
+print(sample_addresses)
+
+# %%
