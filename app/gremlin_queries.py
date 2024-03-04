@@ -103,7 +103,7 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
     return person_id_dict
 
 
-def add_organization(g: GraphTraversalSource, organization_df: pd.DataFrame):
+def add_organizations(g: GraphTraversalSource, organization_df: pd.DataFrame):
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
@@ -180,7 +180,7 @@ def add_edges_person_organization(
 
 
 # %%
-contact_df = pd.read_csv("data/2019-2023_Leads_List_Test.csv")
+contact_df = pd.read_csv("data/2019-2023_Leads_List_Test_deduped.csv")
 
 # %%
 contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
@@ -194,26 +194,26 @@ unique_organizations_df = unique_organizations_df.to_frame()
 # Display the DataFrame with unique organization names
 print(unique_organizations_df)
 
-# %%
-cleaned_df = contact_df.dropna(subset=['Organization']).reset_index(drop=True)
-print(cleaned_df)
+# %% DataFrame containing organization names for the purpose of edge creation between "person" and "organization" nodes:
+cleaned_contact_df = contact_df.dropna(subset=['Organization']).reset_index(drop=True)
+print(cleaned_contact_df)
 
 # %%
 person_id_dict = add_people(g, contact_df)
 
 # %%
-organization_id_dict = add_organization(g, unique_organizations_df)
+organization_id_dict = add_organizations(g, unique_organizations_df)
 
 # %%
-add_edges_person_organization(g, cleaned_df, person_id_dict, organization_id_dict)
+add_edges_person_organization(g, cleaned_contact_df, person_id_dict, organization_id_dict)
 
 # %% TESTING NODES:
-# g.V().drop().iterate()
-g.E().drop().iterate()
+g.V().drop().iterate()
+# g.E().drop().iterate()
 
 # %%
-# g.V().count().next()
-g.E().count().next()
+g.V().count().next()
+# g.E().count().next()
 
 # %%
 check_node_properties(g, "person", "name", "Baback Gharizadeh")
@@ -260,7 +260,7 @@ test_people = get_people_from_organization(g, "Truepill")
 print(test_people)
 
 
-# %% Search by UID for unique people's properties to get a specific property value::
+# %%
 '''
 property_label could be one of the following options:
     "name"
@@ -273,6 +273,7 @@ property_label could be one of the following options:
 '''
 
 
+# Search by UID for a unique person to get a specific property value:
 def get_unique_person_property(g: GraphTraversalSource, uid_value: str, property_label: str):
     return (
         g.V()
@@ -287,7 +288,7 @@ test_unique_person = get_unique_person_property(g, "craig.lower@truepill.com", "
 print(test_unique_person)
 
 
-# %% Search by name for possibly multiple people's to get a specific property value:
+# %% Search by name for possibly multiple people to get a specific property value:
 def get_peoples_property_by_name(g: GraphTraversalSource, name_value: str, property_label: str):
     return (
         g.V()
@@ -299,7 +300,7 @@ def get_peoples_property_by_name(g: GraphTraversalSource, name_value: str, prope
 
 
 # %%
-test_people = get_peoples_property_by_name(g, "Gour Digpal", "email")
+test_people = get_peoples_property_by_name(g, "Suisha T", "email")
 print(test_people)
 
 # %%
@@ -312,5 +313,30 @@ duplicate_names = df.loc[duplicates, 'Full Name'].unique()  # Get the unique dup
 
 # Print or return the list of duplicate "Full Name" values
 print(duplicate_names)
+
+
+# %% Search by UID for a unique person to get all property values:
+def get_unique_person_all_properties(g: GraphTraversalSource, uid_value: str):
+    return (
+        g.V()
+        .has("person", "uid", uid_value)
+        .valueMap(True)
+        .toList()
+    )
+
+
+# %%
+test_unique_person_all_props = get_unique_person_all_properties(g, "suishal@connect.hku.hk")
+print(test_unique_person_all_props)
+
+
+# %%
+def count_unique_people(g: GraphTraversalSource):
+    return g.V().hasLabel('person').dedup().count().next()
+
+
+# %%
+person_count = count_unique_people(g)
+print(person_count)
 
 # %%

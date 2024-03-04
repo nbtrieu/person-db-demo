@@ -1,3 +1,5 @@
+config.json
+
 # Ignore files (but not sub-folders) in the data folder
 data/**
 !data/**/
