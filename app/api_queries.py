@@ -3,11 +3,21 @@ import requests
 import logging
 import json
 import pandas as pd
+import os
 from tqdm import tqdm
+from app.database import BulkApiCaller
 
 with open('config.json', 'r') as file:
     config = json.load(file)
 google_maps_places_api_key = config['apiKeys']['googleMapsPlaces']
+
+# Ensure the 'results' directory exists
+results_dir = 'results'
+if not os.path.exists(results_dir):
+    os.makedirs(results_dir)
+
+# Specify the path including the 'results' folder
+file_path = os.path.join(results_dir, '2019-2023_addresses.csv')
 
 
 # %%
@@ -62,6 +72,8 @@ def filter_best_match(result_list: list, place_name: str):
 
 
 def get_organization_address(organizations_df: pd.DataFrame, api_key: str):
+    query_executor = BulkQueryExecutor()
+
     all_results = []
     organization_names_list = organizations_df["Organization"].tolist()
 
@@ -100,7 +112,17 @@ def get_organization_address(organizations_df: pd.DataFrame, api_key: str):
         # Combine all organization results into the main results list
         all_results.extend(organization_results)
 
-    return all_results
+    results_df = pd.DataFrame(all_results)
+    results_df.to_csv(
+        file_path,
+        sep=',',
+        columns=['organization_name', 'address'],
+        header=True,
+        index=False,
+        encoding='utf-8'
+    )
+
+    return results_df
 
 
 # %%
@@ -125,5 +147,9 @@ print(sample_addresses)
 # %%
 sample_search = search_place("Raksan Investors", google_maps_places_api_key)
 print(sample_search)
+
+# %%
+test_addresses = get_organization_address(unique_organizations_df, google_maps_places_api_key)
+print(test_addresses)
 
 # %%
