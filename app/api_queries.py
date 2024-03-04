@@ -81,17 +81,21 @@ def get_organization_address(organizations_df: pd.DataFrame, api_key: str):
 
         result_list = search_result.get("places", [])
         if not result_list:
-            continue  # Skip this place if no results found
-
-        # Find the best match:
-        best_match_address = filter_best_match(result_list, organization_name)
-        if best_match_address:
+            # If no results found, append the organization with address as None
             result_dict = {
                 "organization_name": organization_name,
-                "address": best_match_address
+                "address": None  # Use None for the address
             }
             organization_results.append(result_dict)
-            break
+        else:
+            # Find the best match:
+            best_match_address = filter_best_match(result_list, organization_name)
+            if best_match_address:
+                result_dict = {
+                    "organization_name": organization_name,
+                    "address": best_match_address
+                }
+                organization_results.append(result_dict)
 
         # Combine all organization results into the main results list
         all_results.extend(organization_results)
@@ -117,5 +121,9 @@ print("small_sample_df:\n", small_sample_df)
 # %%
 sample_addresses = get_organization_address(small_sample_df, google_maps_places_api_key)
 print(sample_addresses)
+
+# %%
+sample_search = search_place("Raksan Investors", google_maps_places_api_key)
+print(sample_search)
 
 # %%
