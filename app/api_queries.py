@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import os
 from tqdm import tqdm
-from database import BulkApiCaller
+from app.database import BulkApiCaller
 
 with open('config.json', 'r') as file:
     config = json.load(file)
