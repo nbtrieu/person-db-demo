@@ -4,8 +4,8 @@ import logging
 import json
 import pandas as pd
 import os
-import time
-from tqdm import tqdm
+from time import sleep
+from tqdm.auto import tqdm
 from database.bulk_api_caller import BulkApiCaller
 
 # %%
@@ -74,7 +74,7 @@ def filter_best_match(result_list: list, place_name: str):
             best_match = result_list[0]["formattedAddress"]
 
     return {
-        "best_match_addresss": best_match,
+        "best_match_address": best_match,
         "display_name": display_name_field
     }
 
@@ -104,17 +104,17 @@ def get_organization_address(
             # If no results found, append the organization with address as None
             result_dict = {
                 "organization_name": organization_name,
+                "display_name": None,
                 "address": None  # Use None for the address
             }
             organization_results.append(result_dict)
         else:
             # Find the best match:
-            best_match_address = filter_best_match(result_list, organization_name)
-            if best_match_address:
-                result_dict = {
-                    "organization_name": organization_name,
-                    "address": best_match_address
-                }
+            best_match_info = filter_best_match(result_list, organization_name)
+            if best_match_info:
+                result_dict["display_name"] = best_match_info["display_name"]
+                result_dict["address"] = best_match_info["best_match_address"]
+
                 organization_results.append(result_dict)
 
         # Combine all organization results into the main results list
@@ -124,7 +124,7 @@ def get_organization_address(
     results_df.to_csv(
         file_path,
         sep=',',
-        columns=['organization_name', 'address'],
+        columns=['organization_name', 'display_name', 'address'],
         header=True,
         index=False,
         encoding='utf-8'
@@ -133,44 +133,52 @@ def get_organization_address(
     return results_df
 
 
-def get_organization_address_bulk(
-    organizations_df: pd.DataFrame, api_key: str, file_path: str
-):
+def get_organization_address_bulk(organizations_df: pd.DataFrame, api_key: str, file_path: str):
     bulk_api_caller = BulkApiCaller(api_key=api_key, batch_size=5)
 
+    # Convert organization names to a list
     organization_names_list = organizations_df["Organization"].tolist()
-    batch_results = bulk_api_caller.search_places_batch(organization_names_list)
-
     all_results = []
-    for result in tqdm(batch_results, desc="Getting addresses in bulk"):
-        organization_name = result["organization_name"]
-        search_results = result["result"]
 
-        # Initialize default values
-        result_dict = {
-            "organization_name": organization_name,
-            "display_name": None,
-            "address": None,
-        }
+    # Define your batch size and delay for throttling
+    mini_batch_size = 5
+    delay_between_batches = 12  # seconds, adjust based on rate limits
 
-        if search_results.get("error"):
-            print(search_results.get("message"))
-        else:
-            result_list = search_results.get("places", [])
-            if result_list:
-                # Assuming filter_best_match returns the best match from result_list
-                best_match_info = filter_best_match(result_list, organization_name)
-                print(best_match_info)
-                if best_match_info:
-                    # If a best match is found, update address and display_name in result_dict
-                    result_dict["display_name"] = best_match_info["display_name"]
-                    result_dict["address"] = best_match_info["best_match_addresss"]
+    # Process in mini-batches
+    for i in tqdm(range(0, len(organization_names_list), mini_batch_size), desc="Processing organizations"):
+        mini_batch = organization_names_list[i:i+mini_batch_size]
+        batch_results = bulk_api_caller.search_places_batch(mini_batch)
 
-        all_results.append(result_dict)
+        for result in batch_results:
+            organization_name = result["organization_name"]
+            search_results = result["result"]
 
-    # Convert all results into a DataFrame
+            # Initialize default values
+            result_dict = {
+                "organization_name": organization_name,
+                "display_name": None,
+                "address": None,
+            }
+
+            if search_results.get("error"):
+                print(search_results.get("message"))
+            else:
+                result_list = search_results.get("places", [])
+                if result_list:
+                    # Process your results to find the best match and extract the necessary information
+                    best_match_info = filter_best_match(result_list, organization_name)
+                    if best_match_info:
+                        result_dict["display_name"] = best_match_info["display_name"]
+                        result_dict["address"] = best_match_info["best_match_address"]
+
+            all_results.append(result_dict)
+
+        # Throttle requests by sleeping between mini-batches
+        if i + mini_batch_size < len(organization_names_list):  # Avoid sleeping on the last batch
+            sleep(delay_between_batches)
+
+    # Convert all results into a DataFrame and save to CSV
     results_df = pd.DataFrame(all_results)
-    # Specify the columns to include in the CSV
     results_df.to_csv(
         file_path,
         sep=',',
@@ -184,14 +192,19 @@ def get_organization_address_bulk(
 
 
 # %%
+# Load the dataframe
 contact_df = pd.read_csv("data/2019-2023_Leads_List_Test_deduped.csv")
 
+# Clean the 'Organization' column
 contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
 
-# Remove duplicates and drop rows with missing 'Organization' values
-unique_organizations_series = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
-# Convert Pandas Series to DataFrame
-unique_organizations_df = unique_organizations_series.to_frame()
+# Remove rows with missing 'Organization' values
+contact_df = contact_df.dropna(subset=['Organization'])
+
+# Remove duplicates based on 'Organization' while keeping all original columns
+unique_organizations_df = contact_df.drop_duplicates(subset=['Organization'])
+
+# Now, contact_df is your unique_organizations_df with all original columns retained
 print("unique_organizations_df:\n", unique_organizations_df)
 
 # %%
