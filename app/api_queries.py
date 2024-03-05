@@ -4,6 +4,7 @@ import logging
 import json
 import pandas as pd
 import os
+import time
 from tqdm import tqdm
 from database.bulk_api_caller import BulkApiCaller
 
@@ -70,9 +71,12 @@ def filter_best_match(result_list: list, place_name: str):
             best_match = address_field
 
         elif match_percentage < 0.5:
-            return result_list[0]["formattedAddress"]
+            best_match = result_list[0]["formattedAddress"]
 
-    return best_match
+    return {
+        "best_match_addresss": best_match,
+        "display_name": display_name_field
+    }
 
 
 def get_organization_address(
@@ -138,28 +142,29 @@ def get_organization_address_bulk(
     batch_results = bulk_api_caller.search_places_batch(organization_names_list)
 
     all_results = []
-    for result in batch_results:
+    for result in tqdm(batch_results, desc="Getting addresses in bulk"):
         organization_name = result["organization_name"]
-        search_result = result["result"]
+        search_results = result["result"]
 
         # Initialize default values
         result_dict = {
             "organization_name": organization_name,
+            "display_name": None,
             "address": None,
-            "display_name": None
         }
 
-        if search_result.get("error"):
-            print(search_result.get("message"))
+        if search_results.get("error"):
+            print(search_results.get("message"))
         else:
-            result_list = search_result.get("places", [])
+            result_list = search_results.get("places", [])
             if result_list:
                 # Assuming filter_best_match returns the best match from result_list
-                best_match = filter_best_match(result_list, organization_name)
-                if best_match:
+                best_match_info = filter_best_match(result_list, organization_name)
+                print(best_match_info)
+                if best_match_info:
                     # If a best match is found, update address and display_name in result_dict
-                    result_dict["display_name"] = best_match["displayName"]["text"]
-                    result_dict["address"] = best_match["formattedAddress"]
+                    result_dict["display_name"] = best_match_info["display_name"]
+                    result_dict["address"] = best_match_info["best_match_addresss"]
 
         all_results.append(result_dict)
 
@@ -198,7 +203,7 @@ sample_list = small_sample_df["Organization"].tolist()
 print(sample_list)
 
 # %%
-sample_addresses = get_organization_address(small_sample_df, google_maps_places_api_key)
+sample_addresses = get_organization_address(small_sample_df, google_maps_places_api_key, file_path)
 print(sample_addresses)
 
 # %%
@@ -217,5 +222,9 @@ print(test_addresses)
 bulk_api_caller = BulkApiCaller(api_key=google_maps_places_api_key, batch_size=5)
 results = bulk_api_caller.search_places_batch(sample_list)
 print(results)
+
+# %%
+test_bulk_addresses = get_organization_address_bulk(unique_organizations_df, google_maps_places_api_key, file_path)
+print(test_bulk_addresses)
 
 # %%
