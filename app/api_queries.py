@@ -79,116 +79,101 @@ def filter_best_match(result_list: list, place_name: str):
     }
 
 
-def get_organization_address(
-    organizations_df: pd.DataFrame, api_key: str, file_path: str
-):
+def get_organization_address(organizations_df: pd.DataFrame, api_key: str, file_path: str):
     all_results = []
-    organization_names_list = organizations_df["Organization"].tolist()
 
-    for organization_name in tqdm(
-        organization_names_list,
-        desc="Getting addresses"
-    ):
-        organization_results = []  # Storing results for each organization separately
+    # Iterate over the DataFrame rows as (index, Series) pairs
+    for index, row in tqdm(organizations_df.iterrows(), desc="Getting addresses", total=organizations_df.shape[0]):
+        organization_name = row["Organization"]
 
         search_result = search_place(organization_name, api_key)
 
-        if search_result == {}:
-            continue  # Skip empty search result
-        if search_result.get("error"):
-            print(search_result.get("message"))  # Log the error message
+        if search_result == {} or search_result.get("error"):
+            print(search_result.get("message", "Unknown error"))  # Log the error message if available
+            # Even in case of error, append a dict to maintain one-to-one row correspondence
+            all_results.append({"display_name": None, "address": None})
             continue
 
         result_list = search_result.get("places", [])
         if not result_list:
-            # If no results found, append the organization with address as None
-            result_dict = {
-                "organization_name": organization_name,
-                "display_name": None,
-                "address": None  # Use None for the address
-            }
-            organization_results.append(result_dict)
-        else:
-            # Find the best match:
-            best_match_info = filter_best_match(result_list, organization_name)
-            if best_match_info:
-                result_dict["display_name"] = best_match_info["display_name"]
-                result_dict["address"] = best_match_info["best_match_address"]
+            all_results.append({"display_name": None, "address": None})
+            continue
 
-                organization_results.append(result_dict)
+        best_match_info = filter_best_match(result_list, organization_name)
+        # Append results with original organization name for merging
+        all_results.append({
+            "Organization": organization_name,  # Ensure this matches the column name in organizations_df exactly
+            "Display Name": best_match_info.get("display_name"),
+            "Address": best_match_info.get("best_match_address")
+        })
 
-        # Combine all organization results into the main results list
-        all_results.extend(organization_results)
-
+    # Convert all results into a DataFrame
     results_df = pd.DataFrame(all_results)
-    results_df.to_csv(
+
+    # Merge the results with the original DataFrame to keep all columns
+    # Ensure both DataFrames have a common column ('Organization' in this case) to merge on
+    final_df = organizations_df.merge(results_df, on="Organization", how="left")
+
+    # Save the merged DataFrame to CSV
+    final_df.to_csv(
         file_path,
         sep=',',
-        columns=['organization_name', 'display_name', 'address'],
-        header=True,
         index=False,
         encoding='utf-8'
     )
 
-    return results_df
+    return final_df
 
 
 def get_organization_address_bulk(organizations_df: pd.DataFrame, api_key: str, file_path: str):
     bulk_api_caller = BulkApiCaller(api_key=api_key, batch_size=5)
-
-    # Convert organization names to a list
-    organization_names_list = organizations_df["Organization"].tolist()
     all_results = []
 
     # Define your batch size and delay for throttling
     mini_batch_size = 5
     delay_between_batches = 12  # seconds, adjust based on rate limits
 
-    # Process in mini-batches
-    for i in tqdm(range(0, len(organization_names_list), mini_batch_size), desc="Processing organizations"):
-        mini_batch = organization_names_list[i:i+mini_batch_size]
-        batch_results = bulk_api_caller.search_places_batch(mini_batch)
+    # Iterate over DataFrame in mini-batches
+    for i in tqdm(range(0, len(organizations_df), mini_batch_size), desc="Processing organizations"):
+        mini_batch_df = organizations_df.iloc[i:i+mini_batch_size]
+        mini_batch_list = mini_batch_df["Organization"].tolist()
+        batch_results = bulk_api_caller.search_places_batch(mini_batch_list)
 
-        for result in batch_results:
+        for index, result in enumerate(batch_results):
             organization_name = result["organization_name"]
             search_results = result["result"]
 
-            # Initialize default values
-            result_dict = {
-                "organization_name": organization_name,
-                "display_name": None,
-                "address": None,
-            }
-
             if search_results.get("error"):
                 print(search_results.get("message"))
+                # Append None values for missing or errored results
+                all_results.append((organization_name, None, None))
             else:
                 result_list = search_results.get("places", [])
                 if result_list:
-                    # Process your results to find the best match and extract the necessary information
                     best_match_info = filter_best_match(result_list, organization_name)
-                    if best_match_info:
-                        result_dict["display_name"] = best_match_info["display_name"]
-                        result_dict["address"] = best_match_info["best_match_address"]
-
-            all_results.append(result_dict)
+                    all_results.append((organization_name, best_match_info.get("display_name"), best_match_info.get("best_match_address")))
+                else:
+                    all_results.append((organization_name, None, None))
 
         # Throttle requests by sleeping between mini-batches
-        if i + mini_batch_size < len(organization_names_list):  # Avoid sleeping on the last batch
+        if i + mini_batch_size < len(organizations_df):  # Avoid sleeping on the last batch
             sleep(delay_between_batches)
 
-    # Convert all results into a DataFrame and save to CSV
-    results_df = pd.DataFrame(all_results)
-    results_df.to_csv(
+    # Create a DataFrame from the results
+    results_df = pd.DataFrame(all_results, columns=["Organization", "Display Name", "Address"])
+
+    # Merge the original DataFrame with the results DataFrame
+    final_df = organizations_df.merge(results_df, on="Organization", how="left")
+
+    # Save the merged DataFrame to CSV
+    final_df.to_csv(
         file_path,
         sep=',',
-        columns=['organization_name', 'display_name', 'address'],
-        header=True,
         index=False,
         encoding='utf-8'
     )
 
-    return results_df
+    return final_df
 
 
 # %%

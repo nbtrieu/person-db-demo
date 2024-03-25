@@ -9,21 +9,14 @@ class BulkApiCaller:
         self.batch_size = batch_size
 
     def search_place(self, place):
-        """Single place search implementation."""
-        url = 'https://places.googleapis.com/v1/places:searchText'
-        payload = {"textQuery": f"address for {place}"}
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': self.api_key,
-            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.priceLevel'
-        }
-
+        response = None  # Initialize response as None
         try:
+            # Your request setup and execution code
             response = requests.post(url, json=payload, headers=headers)
             response.raise_for_status()  # This will raise an HTTPError for bad responses
             return response.json()
         except requests.exceptions.HTTPError as http_err:
-            logging.error(f'HTTP error occurred: {http_err} - {response.text}')
+            logging.error(f'HTTP error occurred: {http_err} - {response.text if response else "No response"}')
         except requests.exceptions.ConnectionError as conn_err:
             logging.error(f'Connection error occurred: {conn_err}')
         except requests.exceptions.Timeout as timeout_err:
@@ -33,7 +26,7 @@ class BulkApiCaller:
         except Exception as e:
             logging.error(f'An unexpected error occurred: {e}')
 
-        # Return a detailed error message or a structured error object for further processing
+        # Make sure to return a structured response even in case of failure
         return {"error": True, "status_code": response.status_code if response else 'N/A', "message": response.text if response else 'No response'}
 
     def search_places_batch(self, places):
