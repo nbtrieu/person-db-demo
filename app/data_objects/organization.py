@@ -3,7 +3,7 @@ class Organization:
     LABEL = "organization"
 
     class PropertyKey:
-        UID = "uid"
+        UID = "uid"  # same as name
         NAME = "name"
         # DOMAIN = "domain"
         # ACRONYM = "acronym"

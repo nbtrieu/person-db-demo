@@ -3,7 +3,7 @@ class Person:
     LABEL = "person"
 
     class PropertyKey:
-        UID = "uid"
+        UID = "uid"  # same as email
         NAME = "name"
         EMAIL = "email"
         PHONE = "phone"
