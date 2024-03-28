@@ -23,7 +23,7 @@ from gremlin_python.process.traversal import (
 )
 from tqdm import tqdm
 from database import BulkQueryExecutor
-from data_objects import Person, Organization
+from data_objects import Person, Organization, Keyword
 
 import nest_asyncio
 nest_asyncio.apply()
@@ -57,6 +57,22 @@ def check_node_properties(g: GraphTraversalSource, label: str, property_key: str
         .toList()
     )
     return properties
+
+
+def create_id_dict(vertex_label: str):
+    node_list = (
+        g.V()
+        .has_label(vertex_label)
+        .project("id", "uid")
+        .by(__.id_())
+        .by(__.values("uid"))
+        .to_list()
+    )
+    id_dict = {
+        node["uid"]: node["id"] for node in node_list
+    }
+
+    return id_dict
 
 
 def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
@@ -155,6 +171,17 @@ def add_organizations(g: GraphTraversalSource, organization_df: pd.DataFrame):  
     return organization_id_dict
 
 
+def process_keywords(interests_row_value: str) -> list:
+    keywords_to_be_added = []
+
+    if ',' in interests_row_value:
+        keywords_to_be_added.extend([keyword.strip() for keyword in interests_row_value.split(',')])
+    else:
+        keywords_to_be_added(interests_row_value.strip())
+
+    return keywords_to_be_added
+
+
 def add_keywords(g: GraphTraversalSource, keyword_df: pd.DataFrame):  # keyword_df derived from 'Area of Interests' column of contact_df
     query_executor = BulkQueryExecutor(g, 100)
 
@@ -163,7 +190,26 @@ def add_keywords(g: GraphTraversalSource, keyword_df: pd.DataFrame):  # keyword_
         total=keyword_df.shape[0],
         desc="Importing Keywords"
     ):
-        keyword_name_value = row.get("Area of Interests")
+        interests_row_value = row["Area of Interests"]
+        if pd.notna(interests_row_value) and interests_row_value.strip() != "":
+            keywords_to_be_added = process_keywords(interests_row_value)
+
+            for keyword in keywords_to_be_added:
+                keyword_name_value = keyword
+                keyword_properties = {
+                    Keyword.PropertyKey.UID: keyword_name_value,
+                    Keyword.PropertyKey.NAME: keyword_name_value
+                }
+                query_executor.add_vertex(
+                    label=Keyword.LABEL,
+                    properties=keyword_properties
+                )
+
+    query_executor.force_execute()
+
+    keyword_id_dict = create_id_dict("keyword")
+
+    return keyword_id_dict
 
 
 def add_edges_person_organization(
@@ -195,8 +241,13 @@ contact_df = pd.read_csv("data/2019-2023_Leads_List_Test_deduped.csv")
 
 # %%
 keywords = contact_df["Area of Interests"][18]
-print(keywords)
-print(type(keywords))
+# print(keywords)
+# print(type(keywords))
+processed_keywords = process_keywords(keywords)
+print(processed_keywords)
+
+# %%
+
 
 # %%
 contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
@@ -206,8 +257,6 @@ unique_organizations_series = contact_df['Organization'].dropna().drop_duplicate
 
 # Convert Pandas Series to DataFrame
 unique_organizations_df = unique_organizations_series.to_frame()
-
-# Display the DataFrame with unique organization names
 print("unique_organizations_df:\n", unique_organizations_df)
 
 # %% DataFrame containing organization names for the purpose of edge creation between "person" and "organization" nodes:
