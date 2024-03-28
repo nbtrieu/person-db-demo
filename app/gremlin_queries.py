@@ -103,13 +103,13 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
     return person_id_dict
 
 
-def add_organizations(g: GraphTraversalSource, organization_df: pd.DataFrame):
+def add_organizations(g: GraphTraversalSource, organization_df: pd.DataFrame):  # organization_df derived from 'Organization' column of contact_df
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
         organization_df.iterrows(),
         total=organization_df.shape[0],
-        desc="Importing Organization"
+        desc="Importing Organizations"
     ):
         # if pd.notnull(row["Email"]):
         #     domain_value = row["Email"].split("@")[-1].lower()
@@ -155,6 +155,17 @@ def add_organizations(g: GraphTraversalSource, organization_df: pd.DataFrame):
     return organization_id_dict
 
 
+def add_keywords(g: GraphTraversalSource, keyword_df: pd.DataFrame):  # keyword_df derived from 'Area of Interests' column of contact_df
+    query_executor = BulkQueryExecutor(g, 100)
+
+    for index, row in tqdm(
+        keyword_df.iterrows(),
+        total=keyword_df.shape[0],
+        desc="Importing Keywords"
+    ):
+        keyword_name_value = row.get("Area of Interests")
+
+
 def add_edges_person_organization(
     g: GraphTraversalSource,
     cleaned_df: pd.DataFrame,
@@ -181,6 +192,11 @@ def add_edges_person_organization(
 
 # %%
 contact_df = pd.read_csv("data/2019-2023_Leads_List_Test_deduped.csv")
+
+# %%
+keywords = contact_df["Area of Interests"][18]
+print(keywords)
+print(type(keywords))
 
 # %%
 contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
