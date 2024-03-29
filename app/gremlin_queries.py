@@ -1,7 +1,9 @@
 # %%
 import pandas as pd
+import numpy as np
 import database
 import ssl
+import pickle
 from gremlin_python.driver.client import Client
 from gremlin_python.process.graph_traversal import GraphTraversalSource, __
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
@@ -105,17 +107,7 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
 
     query_executor.force_execute()
 
-    person_node_list = (
-        g.V()
-        .has_label("person")
-        .project("id", "uid")
-        .by(__.id_())
-        .by(__.values("uid"))
-        .to_list()
-    )
-    person_id_dict = {
-        person_node["uid"]: person_node["id"] for person_node in person_node_list
-    }
+    person_id_dict = create_id_dict("person")
 
     return person_id_dict
 
@@ -153,17 +145,7 @@ def add_organizations(g: GraphTraversalSource, unique_organizations_df: pd.DataF
 
     query_executor.force_execute()
 
-    organization_node_list = (
-        g.V()
-        .has_label("organization")
-        .project("id", "uid")
-        .by(__.id_())
-        .by(__.values("uid"))
-        .to_list()
-    )
-    organization_id_dict = {
-        organization_node["uid"]: organization_node["id"] for organization_node in organization_node_list
-    }
+    organization_id_dict = create_id_dict("organization")
 
     return organization_id_dict
 
@@ -222,16 +204,16 @@ def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):  # 
 
 def add_edges_person_organization(
     g: GraphTraversalSource,
-    cleaned_df: pd.DataFrame,
+    cleaned_org_contact_df: pd.DataFrame,
     person_id_dict: dict,
     organization_id_dict: dict
 ):
     query_executor = BulkQueryExecutor(g, 100)
 
     for _, row in tqdm(
-        cleaned_df.iterrows(),
-        total=cleaned_df.shape[0],
-        desc="Adding edges"
+        cleaned_org_contact_df.iterrows(),
+        total=cleaned_org_contact_df.shape[0],
+        desc="Adding person-organization edges"
     ):
         person_uid_value = row["Email"] if pd.notnull(row["Email"]) else "_".join([row["Full Name"], row["Organization"]]).replace(" ", "_").lower()
         organization_uid_value = row.get("Organization").strip().lower().capitalize()
@@ -240,6 +222,33 @@ def add_edges_person_organization(
         organization_graph_id = organization_id_dict.get(organization_uid_value)
 
         g.V(organization_graph_id).addE("affiliated with").to(__.V(person_graph_id)).iterate()
+
+    query_executor.force_execute()
+
+
+def add_edges_person_keyword(
+    g: GraphTraversalSource,
+    cleaned_interests_contact_df: pd.DataFrame,
+    person_id_dict: dict,
+    keyword_id_dict: dict
+):
+    query_executor = BulkQueryExecutor(g, 100)
+
+    for _, row in tqdm(
+        cleaned_interests_contact_df.iterrows(),
+        total=cleaned_interests_contact_df.shape[0],
+        desc="Adding person-keyword edges"
+    ):
+        person_uid_value = row["Email"] if pd.notnull(row["Email"]) else "_".join([row["Full Name"], row["Organization"]]).replace(" ", "_").lower()
+        person_graph_id = person_id_dict.get(person_uid_value)
+
+        for interests in contact_df["Area of Interests"].dropna():
+            keywords = [keyword.strip() for keyword in interests.split(',')]
+
+        for keyword in keywords:
+            keyword_uid_value = keyword
+            keyword_graph_id = keyword_id_dict.get(keyword_uid_value)
+            g.V(keyword_graph_id).addE("interested in").to(__.V(person_graph_id)).iterate()
 
     query_executor.force_execute()
 
@@ -282,36 +291,64 @@ unique_organizations_series = contact_df['Organization'].dropna().drop_duplicate
 unique_organizations_df = unique_organizations_series.to_frame()
 print("unique_organizations_df:\n", unique_organizations_df)
 
-# %% DataFrame containing organization names for the purpose of edge creation between "person" and "organization" nodes:
-cleaned_contact_df = contact_df.dropna(subset=['Organization']).reset_index(drop=True)
-print("cleaned_contact_df:\n", cleaned_contact_df)
+# %% DataFrame containing non-null organization names for the purpose of edge creation between "person" and "organization" nodes:
+cleaned_org_contact_df = contact_df.dropna(subset=['Organization']).reset_index(drop=True)
+print("cleaned_org_contact_df:\n", cleaned_org_contact_df)
 
 # %%
+# %% DataFrame containing non-null "Area of Interests" values for the purpose of edge creation between "person" and "keyword" nodes:
+# Replace "- None -", "N/A", "null" with numpy.nan
+contact_df['Area of Interests'].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
+cleaned_interests_contact_df = contact_df.dropna(subset=['Area of Interests']).reset_index(drop=True)
+print("cleaned_interests_contact_df:\n", cleaned_interests_contact_df)
+
+# %% VERTEX CREATION:
 person_id_dict = add_people(g, contact_df)
 
 # %%
+file_path = './dicts/person_id_dict.pickle'
+with open(file_path, 'wb') as handle:
+    pickle.dump(person_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+# %%
 organization_id_dict = add_organizations(g, unique_organizations_df)
+
+# %%
+file_path = './dicts/organization_id_dict.pickle'
+with open(file_path, 'wb') as handle:
+    pickle.dump(organization_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 # %%
 keyword_id_dict = add_keywords(g, unique_keywords_df)
 print(keyword_id_dict)
 
 # %%
-add_edges_person_organization(g, cleaned_contact_df, person_id_dict, organization_id_dict)
+file_path = './dicts/keyword_id_dict.pickle'
+with open(file_path, 'wb') as handle:
+    pickle.dump(keyword_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-# %% TESTING NODES:
-g.V().drop().iterate()
-# g.E().drop().iterate()
+# %% EDGE CREATION:
+add_edges_person_keyword(g, cleaned_interests_contact_df, person_id_dict, keyword_id_dict)
 
 # %%
-g.V().count().next()
-# g.E().count().next()
+add_edges_person_organization(g, cleaned_org_contact_df, person_id_dict, organization_id_dict)
+
+# %% TESTING NODES:
+# g.V().drop().iterate()
+g.E().drop().iterate()
+
+# %%
+# g.V().count().next()
+g.E().count().next()
 
 # %%
 check_node_properties(g, "person", "name", "Baback Gharizadeh")
 
 # %%
 check_node_properties(g, "organization", "name", "Truepill")
+
+# %%
+check_node_properties(g, "keyword", "name", "Sample Collection")  # DEBUG NEEDED: 'connected_nodes': []
 
 
 # %% QUERYING DATA:
