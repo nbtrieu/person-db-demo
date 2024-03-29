@@ -29,14 +29,15 @@ import nest_asyncio
 nest_asyncio.apply()
 
 # Path to the exported server certificate
-cert_path = '/Users/nicoletrieu/server-cert.pem'
+cert_path = '/Users/nicoletrieu/localhost_cert.pem'
 
-# Create an SSL context that trusts the server's certificate
-ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+# Create a default client-side SSL context
+ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
 ssl_context.load_verify_locations(cert_path)
 
 # Use the SSL context in the DriverRemoteConnection
 connection = DriverRemoteConnection('wss://localhost:8182/gremlin', 'g', ssl_context=ssl_context)
+# connection = DriverRemoteConnection('ws://localhost:8182/gremlin', 'g')
 g = Graph().traversal().withRemote(connection)
 
 
@@ -119,26 +120,22 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
     return person_id_dict
 
 
-def add_organizations(g: GraphTraversalSource, organization_df: pd.DataFrame):  # organization_df derived from 'Organization' column of contact_df
+def extract_unique_organizations(contact_df: pd.DataFrame):
+    contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
+    unique_organizations_series = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
+    unique_organizations_df = unique_organizations_series.to_frame()
+    print("unique_organizations_df:\n", unique_organizations_df)
+    return unique_organizations_df
+
+
+def add_organizations(g: GraphTraversalSource, unique_organizations_df: pd.DataFrame):  # organization_df derived from 'Organization' column of contact_df
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
-        organization_df.iterrows(),
-        total=organization_df.shape[0],
+        unique_organizations_df.iterrows(),
+        total=unique_organizations_df.shape[0],
         desc="Importing Organizations"
     ):
-        # if pd.notnull(row["Email"]):
-        #     domain_value = row["Email"].split("@")[-1].lower()
-        #     acronym_value = domain_value.split(".")[0]
-        # else:
-        #     domain_value = None
-        #     acronym_value = None
-
-        # if pd.notnull(row["Organization"]):
-        #     organization_name_value = row["Organization"].strip().lower().capitalize()
-        # else:
-        #     organization_name_value = "N/A"
-
         organization_name_value = row.get("Organization").strip().lower().capitalize()  # Normalize the organization name
 
         organization_properties = {
@@ -146,7 +143,7 @@ def add_organizations(g: GraphTraversalSource, organization_df: pd.DataFrame):  
             Organization.PropertyKey.NAME: organization_name_value,
             # Organization.PropertyKey.DOMAIN: domain_value,
             # Organization.PropertyKey.ACRONYM: acronym_value,
-            ** ({Organization.PropertyKey.MAILING_ADDRESS: row["Organization's Mailing Address"]} if "Organization's Mailing Address" in organization_df.columns and not pd.isnull(row.get("Organization's Mailing Address")) else {})
+            ** ({Organization.PropertyKey.MAILING_ADDRESS: row["Organization's Mailing Address"]} if "Organization's Mailing Address" in unique_organizations_df.columns and not pd.isnull(row.get("Organization's Mailing Address")) else {})
         }
 
         query_executor.add_vertex(
@@ -182,28 +179,39 @@ def process_keywords(interests_row_value: str) -> list:
     return keywords_to_be_added
 
 
-def add_keywords(g: GraphTraversalSource, keyword_df: pd.DataFrame):  # keyword_df derived from 'Area of Interests' column of contact_df
+def extract_unique_keywords(contact_df: pd.DataFrame):
+    ignore_list = ["- None -", "N/A", "null"]
+
+    all_keywords = []
+    for interests in contact_df["Area of Interests"].dropna():
+        keywords = [keyword.strip() for keyword in interests.split(',') if keyword.strip() not in ignore_list]
+        all_keywords.extend(keywords)
+
+    unique_keywords = list(set(all_keywords))
+
+    unique_keywords_df = pd.DataFrame(unique_keywords, columns=["Keyword"])
+
+    return unique_keywords_df
+
+
+def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):  # keyword_df derived from 'Area of Interests' column of contact_df
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
-        keyword_df.iterrows(),
-        total=keyword_df.shape[0],
+        unique_keywords_df.iterrows(),
+        total=unique_keywords_df.shape[0],
         desc="Importing Keywords"
     ):
-        interests_row_value = row["Area of Interests"]
-        if pd.notna(interests_row_value) and interests_row_value.strip() != "":
-            keywords_to_be_added = process_keywords(interests_row_value)
+        keyword_name_value = row.get("Keyword")
+        keyword_properties = {
+            Keyword.PropertyKey.UID: keyword_name_value,
+            Keyword.PropertyKey.NAME: keyword_name_value
+        }
 
-            for keyword in keywords_to_be_added:
-                keyword_name_value = keyword
-                keyword_properties = {
-                    Keyword.PropertyKey.UID: keyword_name_value,
-                    Keyword.PropertyKey.NAME: keyword_name_value
-                }
-                query_executor.add_vertex(
-                    label=Keyword.LABEL,
-                    properties=keyword_properties
-                )
+        query_executor.add_vertex(
+            label=Keyword.LABEL,
+            properties=keyword_properties
+        )
 
     query_executor.force_execute()
 
@@ -247,7 +255,22 @@ processed_keywords = process_keywords(keywords)
 print(processed_keywords)
 
 # %%
+test_contact_df = pd.DataFrame({
+    "Area of Interests": [
+        "Sample Collection",
+        "Assay Development, Epigenetics/NGS/RNA-Seq, Microbiomics, Sample Collection",
+        None,  # Example of a row with no interests
+        "- None -",
+        "Microbiomics, Epigenetics/NGS/RNA-Seq",  # Duplicates to show removal
+    ]
+})
 
+unique_keywords_df = extract_unique_keywords(test_contact_df)
+print(unique_keywords_df)
+
+# %%
+unique_keywords_df = extract_unique_keywords(contact_df)
+print(unique_keywords_df)
 
 # %%
 contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
@@ -268,6 +291,10 @@ person_id_dict = add_people(g, contact_df)
 
 # %%
 organization_id_dict = add_organizations(g, unique_organizations_df)
+
+# %%
+keyword_id_dict = add_keywords(g, unique_keywords_df)
+print(keyword_id_dict)
 
 # %%
 add_edges_person_organization(g, cleaned_contact_df, person_id_dict, organization_id_dict)
