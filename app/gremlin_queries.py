@@ -4,6 +4,7 @@ import numpy as np
 import database
 import ssl
 import pickle
+import os
 from gremlin_python.driver.client import Client
 from gremlin_python.process.graph_traversal import GraphTraversalSource, __
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
@@ -30,17 +31,28 @@ from data_objects import Person, Organization, Keyword
 import nest_asyncio
 nest_asyncio.apply()
 
-# Path to the exported server certificate
-cert_path = '/Users/nicoletrieu/localhost_cert.pem'
+# # Path to the exported server certificate
+# cert_path = '/Users/nicoletrieu/localhost_cert.pem'
 
-# Create a default client-side SSL context
-ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-ssl_context.load_verify_locations(cert_path)
+# # Create a default client-side SSL context
+# ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+# ssl_context.load_verify_locations(cert_path)
 
-# Use the SSL context in the DriverRemoteConnection
-connection = DriverRemoteConnection('wss://localhost:8182/gremlin', 'g', ssl_context=ssl_context)
-# connection = DriverRemoteConnection('ws://localhost:8182/gremlin', 'g')
-g = Graph().traversal().withRemote(connection)
+# # Use the SSL context in the DriverRemoteConnection
+# connection = DriverRemoteConnection('wss://localhost:8182/gremlin', 'g', ssl_context=ssl_context)
+# # connection = DriverRemoteConnection('ws://localhost:8182/gremlin', 'g')
+# g = Graph().traversal().withRemote(connection)
+
+# os.environ[
+#     "DB_URL"
+# ] = "wss://db-bio-annotations.cluster-cu9wyuyqqen8.ap-southeast-1.neptune.amazonaws.com:8182/gremlin"
+
+# db_url = os.environ[
+#     "DB_URL"
+# ]
+# connection = database.Connection(db_url)
+# connection.log_graph_status()
+# g = connection.traversal_source
 
 
 # %% IMPORTING DATA:
@@ -62,7 +74,7 @@ def check_node_properties(g: GraphTraversalSource, label: str, property_key: str
     return properties
 
 
-def create_id_dict(vertex_label: str):
+def create_id_dict(g: GraphTraversalSource, vertex_label: str):
     node_list = (
         g.V()
         .has_label(vertex_label)
@@ -107,10 +119,6 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
 
     query_executor.force_execute()
 
-    person_id_dict = create_id_dict("person")
-
-    return person_id_dict
-
 
 def extract_unique_organizations(contact_df: pd.DataFrame):
     contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
@@ -144,10 +152,6 @@ def add_organizations(g: GraphTraversalSource, unique_organizations_df: pd.DataF
         )
 
     query_executor.force_execute()
-
-    organization_id_dict = create_id_dict("organization")
-
-    return organization_id_dict
 
 
 def process_keywords(interests_row_value: str) -> list:
@@ -197,18 +201,15 @@ def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):  # 
 
     query_executor.force_execute()
 
-    keyword_id_dict = create_id_dict("keyword")
-
-    return keyword_id_dict
-
 
 def add_edges_person_organization(
     g: GraphTraversalSource,
     cleaned_org_contact_df: pd.DataFrame,
-    person_id_dict: dict,
-    organization_id_dict: dict
 ):
     query_executor = BulkQueryExecutor(g, 100)
+
+    person_id_dict = create_id_dict(g, "person")
+    organization_id_dict = create_id_dict(g, "organization")
 
     for _, row in tqdm(
         cleaned_org_contact_df.iterrows(),
@@ -229,10 +230,11 @@ def add_edges_person_organization(
 def add_edges_person_keyword(
     g: GraphTraversalSource,
     cleaned_interests_contact_df: pd.DataFrame,
-    person_id_dict: dict,
-    keyword_id_dict: dict
 ):
     query_executor = BulkQueryExecutor(g, 100)
+
+    person_id_dict = create_id_dict(g, "person")
+    keyword_id_dict = create_id_dict(g, "keyword")
 
     for _, row in tqdm(
         cleaned_interests_contact_df.iterrows(),
@@ -242,7 +244,7 @@ def add_edges_person_keyword(
         person_uid_value = row["Email"] if pd.notnull(row["Email"]) else "_".join([row["Full Name"], row["Organization"]]).replace(" ", "_").lower()
         person_graph_id = person_id_dict.get(person_uid_value)
 
-        for interests in contact_df["Area of Interests"].dropna():
+        for interests in cleaned_interests_contact_df["Area of Interests"]:
             keywords = [keyword.strip() for keyword in interests.split(',')]
 
         for keyword in keywords:
@@ -253,219 +255,219 @@ def add_edges_person_keyword(
     query_executor.force_execute()
 
 
-# %%
-contact_df = pd.read_csv("data/2019-2023_Leads_List_Test_deduped.csv")
+# # %%
+# contact_df = pd.read_csv("data/2019-2023_Leads_List_Test_deduped.csv")
 
-# %%
-keywords = contact_df["Area of Interests"][18]
-# print(keywords)
-# print(type(keywords))
-processed_keywords = process_keywords(keywords)
-print(processed_keywords)
+# # %%
+# keywords = contact_df["Area of Interests"][18]
+# # print(keywords)
+# # print(type(keywords))
+# processed_keywords = process_keywords(keywords)
+# print(processed_keywords)
 
-# %%
-test_contact_df = pd.DataFrame({
-    "Area of Interests": [
-        "Sample Collection",
-        "Assay Development, Epigenetics/NGS/RNA-Seq, Microbiomics, Sample Collection",
-        None,  # Example of a row with no interests
-        "- None -",
-        "Microbiomics, Epigenetics/NGS/RNA-Seq",  # Duplicates to show removal
-    ]
-})
+# # %%
+# test_contact_df = pd.DataFrame({
+#     "Area of Interests": [
+#         "Sample Collection",
+#         "Assay Development, Epigenetics/NGS/RNA-Seq, Microbiomics, Sample Collection",
+#         None,  # Example of a row with no interests
+#         "- None -",
+#         "Microbiomics, Epigenetics/NGS/RNA-Seq",  # Duplicates to show removal
+#     ]
+# })
 
-unique_keywords_df = extract_unique_keywords(test_contact_df)
-print(unique_keywords_df)
+# unique_keywords_df = extract_unique_keywords(test_contact_df)
+# print(unique_keywords_df)
 
-# %%
-unique_keywords_df = extract_unique_keywords(contact_df)
-print(unique_keywords_df)
+# # %%
+# unique_keywords_df = extract_unique_keywords(contact_df)
+# print(unique_keywords_df)
 
-# %%
-contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
+# # %%
+# contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
 
-# Remove duplicates and drop rows with missing 'Organization' values
-unique_organizations_series = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
+# # Remove duplicates and drop rows with missing 'Organization' values
+# unique_organizations_series = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
 
-# Convert Pandas Series to DataFrame
-unique_organizations_df = unique_organizations_series.to_frame()
-print("unique_organizations_df:\n", unique_organizations_df)
+# # Convert Pandas Series to DataFrame
+# unique_organizations_df = unique_organizations_series.to_frame()
+# print("unique_organizations_df:\n", unique_organizations_df)
 
-# %% DataFrame containing non-null organization names for the purpose of edge creation between "person" and "organization" nodes:
-cleaned_org_contact_df = contact_df.dropna(subset=['Organization']).reset_index(drop=True)
-print("cleaned_org_contact_df:\n", cleaned_org_contact_df)
+# # %% DataFrame containing non-null organization names for the purpose of edge creation between "person" and "organization" nodes:
+# cleaned_org_contact_df = contact_df.dropna(subset=['Organization']).reset_index(drop=True)
+# print("cleaned_org_contact_df:\n", cleaned_org_contact_df)
 
-# %%
-# %% DataFrame containing non-null "Area of Interests" values for the purpose of edge creation between "person" and "keyword" nodes:
-# Replace "- None -", "N/A", "null" with numpy.nan
-contact_df['Area of Interests'].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
-cleaned_interests_contact_df = contact_df.dropna(subset=['Area of Interests']).reset_index(drop=True)
-print("cleaned_interests_contact_df:\n", cleaned_interests_contact_df)
+# # %%
+# # %% DataFrame containing non-null "Area of Interests" values for the purpose of edge creation between "person" and "keyword" nodes:
+# # Replace "- None -", "N/A", "null" with numpy.nan
+# contact_df['Area of Interests'].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
+# cleaned_interests_contact_df = contact_df.dropna(subset=['Area of Interests']).reset_index(drop=True)
+# print("cleaned_interests_contact_df:\n", cleaned_interests_contact_df)
 
-# %% VERTEX CREATION:
-person_id_dict = add_people(g, contact_df)
+# # %% VERTEX CREATION:
+# person_id_dict = add_people(g, contact_df)
 
-# %%
-file_path = './dicts/person_id_dict.pickle'
-with open(file_path, 'wb') as handle:
-    pickle.dump(person_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+# # %%
+# file_path = './dicts/person_id_dict.pickle'
+# with open(file_path, 'wb') as handle:
+#     pickle.dump(person_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-# %%
-organization_id_dict = add_organizations(g, unique_organizations_df)
+# # %%
+# organization_id_dict = add_organizations(g, unique_organizations_df)
 
-# %%
-file_path = './dicts/organization_id_dict.pickle'
-with open(file_path, 'wb') as handle:
-    pickle.dump(organization_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+# # %%
+# file_path = './dicts/organization_id_dict.pickle'
+# with open(file_path, 'wb') as handle:
+#     pickle.dump(organization_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-# %%
-keyword_id_dict = add_keywords(g, unique_keywords_df)
-print(keyword_id_dict)
+# # %%
+# keyword_id_dict = add_keywords(g, unique_keywords_df)
+# print(keyword_id_dict)
 
-# %%
-file_path = './dicts/keyword_id_dict.pickle'
-with open(file_path, 'wb') as handle:
-    pickle.dump(keyword_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+# # %%
+# file_path = './dicts/keyword_id_dict.pickle'
+# with open(file_path, 'wb') as handle:
+#     pickle.dump(keyword_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-# %% EDGE CREATION:
-add_edges_person_keyword(g, cleaned_interests_contact_df, person_id_dict, keyword_id_dict)
+# # %% EDGE CREATION:
+# add_edges_person_keyword(g, cleaned_interests_contact_df, person_id_dict, keyword_id_dict)
 
-# %%
-add_edges_person_organization(g, cleaned_org_contact_df, person_id_dict, organization_id_dict)
+# # %%
+# add_edges_person_organization(g, cleaned_org_contact_df, person_id_dict, organization_id_dict)
 
-# %% TESTING NODES:
-# g.V().drop().iterate()
-g.E().drop().iterate()
+# # %% TESTING NODES:
+# # g.V().drop().iterate()
+# g.E().drop().iterate()
 
-# %%
-# g.V().count().next()
-g.E().count().next()
+# # %%
+# # g.V().count().next()
+# g.E().count().next()
 
-# %%
-check_node_properties(g, "person", "name", "Baback Gharizadeh")
+# # %%
+# check_node_properties(g, "person", "name", "Baback Gharizadeh")
 
-# %%
-check_node_properties(g, "organization", "name", "Truepill")
+# # %%
+# check_node_properties(g, "organization", "name", "Truepill")
 
-# %%
-check_node_properties(g, "keyword", "name", "Sample Collection")  # DEBUG NEEDED: 'connected_nodes': []
-
-
-# %% QUERYING DATA:
-def get_organization_by_person_name(g: GraphTraversalSource, person_name: str):
-    return (
-        g.V()
-        .has("person", "name", person_name)
-        .bothE()
-        .outV()
-        .hasLabel("organization")
-        .valueMap(True)
-        .dedup()
-        .toList()
-    )
+# # %%
+# check_node_properties(g, "keyword", "name", "Sample Collection")  # DEBUG NEEDED: 'connected_nodes': []
 
 
-# %%
-test_org = get_organization_by_person_name(g, "Gour Digpal")
-print(test_org)
+# # %% QUERYING DATA:
+# def get_organization_by_person_name(g: GraphTraversalSource, person_name: str):
+#     return (
+#         g.V()
+#         .has("person", "name", person_name)
+#         .bothE()
+#         .outV()
+#         .hasLabel("organization")
+#         .valueMap(True)
+#         .dedup()
+#         .toList()
+#     )
 
 
-# %%
-def get_people_from_organization(g: GraphTraversalSource, organization_name: str):
-    return (
-        g.V()
-        .has("organization", "name", organization_name)
-        .bothE()
-        .inV()
-        .hasLabel("person")
-        .valueMap(True)
-        .dedup()
-        .toList()
-    )
+# # %%
+# test_org = get_organization_by_person_name(g, "Gour Digpal")
+# print(test_org)
 
 
-# %%
-test_people = get_people_from_organization(g, "Truepill")
-print(test_people)
+# # %%
+# def get_people_from_organization(g: GraphTraversalSource, organization_name: str):
+#     return (
+#         g.V()
+#         .has("organization", "name", organization_name)
+#         .bothE()
+#         .inV()
+#         .hasLabel("person")
+#         .valueMap(True)
+#         .dedup()
+#         .toList()
+#     )
 
 
-# %%
-'''
-property_label could be one of the following options:
-    "name"
-    "phone"
-    "title"
-    "mailing_address"
-    "interest_areas"
-    "lead_source"
-    "event_name"
-'''
+# # %%
+# test_people = get_people_from_organization(g, "Truepill")
+# print(test_people)
 
 
-# Search by UID for a unique person to get a specific property value:
-def get_unique_person_property(g: GraphTraversalSource, uid_value: str, property_label: str):
-    return (
-        g.V()
-        .has("person", "uid", uid_value)
-        .values(property_label)
-        .next()
-    )
+# # %%
+# '''
+# property_label could be one of the following options:
+#     "name"
+#     "phone"
+#     "title"
+#     "mailing_address"
+#     "interest_areas"
+#     "lead_source"
+#     "event_name"
+# '''
 
 
-# %%
-test_unique_person = get_unique_person_property(g, "craig.lower@truepill.com", "lead_source")
-print(test_unique_person)
+# # Search by UID for a unique person to get a specific property value:
+# def get_unique_person_property(g: GraphTraversalSource, uid_value: str, property_label: str):
+#     return (
+#         g.V()
+#         .has("person", "uid", uid_value)
+#         .values(property_label)
+#         .next()
+#     )
 
 
-# %% Search by name for possibly multiple people to get a specific property value:
-def get_peoples_property_by_name(g: GraphTraversalSource, name_value: str, property_label: str):
-    return (
-        g.V()
-        .has("person", "name", name_value)
-        .values(property_label)
-        .dedup()
-        .toList()
-    )
+# # %%
+# test_unique_person = get_unique_person_property(g, "craig.lower@truepill.com", "lead_source")
+# print(test_unique_person)
 
 
-# %%
-test_people = get_peoples_property_by_name(g, "Suisha T", "email")
-print(test_people)
-
-# %%
-file_path = 'data/2019-2023_Leads_List_Test.csv'
-df = pd.read_csv(file_path)
-
-# Find duplicates in the "Full Name" column
-duplicates = df['Full Name'].duplicated(keep=False)  # Marks all duplicates as True
-duplicate_names = df.loc[duplicates, 'Full Name'].unique()  # Get the unique duplicate names
-
-# Print or return the list of duplicate "Full Name" values
-print(duplicate_names)
+# # %% Search by name for possibly multiple people to get a specific property value:
+# def get_peoples_property_by_name(g: GraphTraversalSource, name_value: str, property_label: str):
+#     return (
+#         g.V()
+#         .has("person", "name", name_value)
+#         .values(property_label)
+#         .dedup()
+#         .toList()
+#     )
 
 
-# %% Search by UID for a unique person to get all property values:
-def get_unique_person_all_properties(g: GraphTraversalSource, uid_value: str):
-    return (
-        g.V()
-        .has("person", "uid", uid_value)
-        .valueMap(True)
-        .toList()
-    )
+# # %%
+# test_people = get_peoples_property_by_name(g, "Suisha T", "email")
+# print(test_people)
+
+# # %%
+# file_path = 'data/2019-2023_Leads_List_Test.csv'
+# df = pd.read_csv(file_path)
+
+# # Find duplicates in the "Full Name" column
+# duplicates = df['Full Name'].duplicated(keep=False)  # Marks all duplicates as True
+# duplicate_names = df.loc[duplicates, 'Full Name'].unique()  # Get the unique duplicate names
+
+# # Print or return the list of duplicate "Full Name" values
+# print(duplicate_names)
 
 
-# %%
-test_unique_person_all_props = get_unique_person_all_properties(g, "suishal@connect.hku.hk")
-print(test_unique_person_all_props)
+# # %% Search by UID for a unique person to get all property values:
+# def get_unique_person_all_properties(g: GraphTraversalSource, uid_value: str):
+#     return (
+#         g.V()
+#         .has("person", "uid", uid_value)
+#         .valueMap(True)
+#         .toList()
+#     )
 
 
-# %%
-def count_unique_people(g: GraphTraversalSource):
-    return g.V().hasLabel('person').dedup().count().next()
+# # %%
+# test_unique_person_all_props = get_unique_person_all_properties(g, "suishal@connect.hku.hk")
+# print(test_unique_person_all_props)
 
 
-# %%
-person_count = count_unique_people(g)
-print(person_count)
+# # %%
+# def count_unique_people(g: GraphTraversalSource):
+#     return g.V().hasLabel('person').dedup().count().next()
 
-# %%
+
+# # %%
+# person_count = count_unique_people(g)
+# print(person_count)
+
+# # %%
