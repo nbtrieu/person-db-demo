@@ -61,6 +61,29 @@ def count_nodes_in_db(g: GraphTraversalSource, label: str):
     return node_count
 
 
+def count_edges_in_db(g: GraphTraversalSource, label: str):
+    edge_count = g.E().hasLabel(label).count().next()
+    return edge_count
+
+
+def drop_nodes(g: GraphTraversalSource, label: str):
+    print("Initiating drop_nodes...")
+    g.V().hasLabel(label).drop().iterate()
+    print(f"{label} nodes dropped")
+    return
+
+
+def drop_edges(g: GraphTraversalSource, label: str):
+    g.E().hasLabel(label).drop().iterate()
+    print(f"'{label}' edges dropped")
+    return
+
+
+def get_names(g: GraphTraversalSource, label: str):
+    name_list = g.V().hasLabel(label).values('name').toList()
+    return name_list
+
+
 def check_node_properties(g: GraphTraversalSource, label: str, property_key: str, property_value: str):
     properties = (
         g.V()
@@ -101,15 +124,19 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
         person_uid_value = row["Email"] if pd.notnull(row["Email"]) else "_".join([row["Full Name"], row["Organization"]]).replace(" ", "_").lower()
 
         person_properties = {
-            Person.PropertyKey.UID: person_uid_value,
-            Person.PropertyKey.NAME: row.get("Full Name", None),
+            Person.PropertyKey.UUID: person_uid_value,
+            Person.PropertyKey.FIRST_NAME: row.get("First Name", None),
+            Person.PropertyKey.LAST_NAME: row.get("Last Name", None),
+            Person.PropertyKey.FULL_NAME: row.get("Full Name", None),
             Person.PropertyKey.EMAIL: row.get("Email", None),
             Person.PropertyKey.PHONE: row.get("Phone", None),
             Person.PropertyKey.TITLE: row.get("Title", None),
+            Person.PropertyKey.ORGANIZATION: row.get("Organization", None),
             Person.PropertyKey.INTEREST_AREAS: row.get("Area of Interests", None),
-            Person.PropertyKey.LEAD_SOURCE: row.get("Lead Source", None),
-            Person.PropertyKey.EVENT_NAME: row.get("Event Name", None),
-            ** ({Person.PropertyKey.MAILING_ADDRESS: row["Lead's Mailing Address"]} if "Lead's Mailing Address" in contact_df.columns and not pd.isnull(row.get("Lead's Mailing Address")) else {})
+            ** ({Person.PropertyKey.LEAD_SOURCE: row["Lead Source"]} if "Lead Source" in contact_df.columns and not pd.isnull(row.get("Lead Source")) else {}),
+            ** ({Person.PropertyKey.EVENT_NAME: row["Event Name"]} if "Event Name" in contact_df.columns and not pd.isnull(row.get("Event Name")) else {}),
+            ** ({Person.PropertyKey.MAILING_ADDRESS: row["Mailing Address"]} if "Mailing Address" in contact_df.columns and not pd.isnull(row.get("Mailing Address")) else {}),
+            Person.PropertyKey.INGESTION_TAG: row.get("Ingestion Tag", None)
         }
 
         query_executor.add_vertex(
@@ -136,11 +163,11 @@ def add_organizations(g: GraphTraversalSource, unique_organizations_df: pd.DataF
         total=unique_organizations_df.shape[0],
         desc="Importing Organizations"
     ):
-        organization_name_value = row.get("Organization").strip().lower().capitalize()  # Normalize the organization name
+        organization_uid_value = row.get("Organization").strip().lower().capitalize()  # Normalize the organization name
 
         organization_properties = {
-            Organization.PropertyKey.UID: organization_name_value,
-            Organization.PropertyKey.NAME: organization_name_value,
+            Organization.PropertyKey.UID: organization_uid_value,
+            Organization.PropertyKey.NAME: row.get("Organization"),
             # Organization.PropertyKey.DOMAIN: domain_value,
             # Organization.PropertyKey.ACRONYM: acronym_value,
             ** ({Organization.PropertyKey.MAILING_ADDRESS: row["Organization's Mailing Address"]} if "Organization's Mailing Address" in unique_organizations_df.columns and not pd.isnull(row.get("Organization's Mailing Address")) else {})
@@ -222,7 +249,7 @@ def add_edges_person_organization(
         person_graph_id = person_id_dict.get(person_uid_value)
         organization_graph_id = organization_id_dict.get(organization_uid_value)
 
-        g.V(organization_graph_id).addE("affiliated with").to(__.V(person_graph_id)).iterate()
+        g.V(organization_graph_id).addE("affiliated_with").to(__.V(person_graph_id)).iterate()
 
     query_executor.force_execute()
 
@@ -244,13 +271,17 @@ def add_edges_person_keyword(
         person_uid_value = row["Email"] if pd.notnull(row["Email"]) else "_".join([row["Full Name"], row["Organization"]]).replace(" ", "_").lower()
         person_graph_id = person_id_dict.get(person_uid_value)
 
-        for interests in cleaned_interests_contact_df["Area of Interests"]:
-            keywords = [keyword.strip() for keyword in interests.split(',')]
+        # This should be within the row loop to process each row's interests
+        interests = row["Area of Interests"]
+        keywords = [keyword.strip() for keyword in interests.split(',')]
 
         for keyword in keywords:
             keyword_uid_value = keyword
             keyword_graph_id = keyword_id_dict.get(keyword_uid_value)
-            g.V(keyword_graph_id).addE("interested in").to(__.V(person_graph_id)).iterate()
+
+            # You should check if the graph IDs exist before trying to create edges
+            if person_graph_id is not None and keyword_graph_id is not None:
+                g.V(person_graph_id).addE("interested_in").to(__.V(keyword_graph_id)).iterate()
 
     query_executor.force_execute()
 
@@ -353,86 +384,142 @@ def add_edges_person_keyword(
 # check_node_properties(g, "keyword", "name", "Sample Collection")  # DEBUG NEEDED: 'connected_nodes': []
 
 
-# # %% QUERYING DATA:
-# def get_organization_by_person_name(g: GraphTraversalSource, person_name: str):
-#     return (
-#         g.V()
-#         .has("person", "name", person_name)
-#         .bothE()
-#         .outV()
-#         .hasLabel("organization")
-#         .valueMap(True)
-#         .dedup()
-#         .toList()
-#     )
+# %% QUERYING DATA:
+def get_people_by_keyword(g: GraphTraversalSource, keyword: str):
+    return (
+        g.V()
+        .has("keyword", "name", keyword)
+        .bothE()
+        .outV()
+        .hasLabel("person")
+        .valueMap()
+        .dedup()
+        .toList()
+    )
 
 
-# # %%
+def get_organization_by_person_name(g: GraphTraversalSource, person_name: str):
+    return (
+        g.V()
+        .has("person", "name", person_name)
+        .bothE()
+        .outV()
+        .hasLabel("organization")
+        .valueMap(True)
+        .dedup()
+        .toList()
+    )
+
+
+# %%
 # test_org = get_organization_by_person_name(g, "Gour Digpal")
 # print(test_org)
 
 
-# # %%
-# def get_people_from_organization(g: GraphTraversalSource, organization_name: str):
-#     return (
-#         g.V()
-#         .has("organization", "name", organization_name)
-#         .bothE()
-#         .inV()
-#         .hasLabel("person")
-#         .valueMap(True)
-#         .dedup()
-#         .toList()
-#     )
+# %%
+def get_people_from_organization(g: GraphTraversalSource, organization_name: str):
+    return (
+        g.V()
+        .has("organization", "name", organization_name)
+        .bothE()
+        .inV()
+        .hasLabel("person")
+        .valueMap()
+        .dedup()
+        .toList()
+    )
 
 
-# # %%
+# %%
 # test_people = get_people_from_organization(g, "Truepill")
 # print(test_people)
 
 
-# # %%
-# '''
-# property_label could be one of the following options:
-#     "name"
-#     "phone"
-#     "title"
-#     "mailing_address"
-#     "interest_areas"
-#     "lead_source"
-#     "event_name"
-# '''
+# %% Search by name for possibly multiple people to get all property values:
+def get_people_by_full_name(g: GraphTraversalSource, name_value: str):
+    return (
+        g.V()
+        .has("person", "full_name", name_value)
+        .valueMap()
+        .dedup()
+        .toList()
+    )
 
 
-# # Search by UID for a unique person to get a specific property value:
-# def get_unique_person_property(g: GraphTraversalSource, uid_value: str, property_label: str):
-#     return (
-#         g.V()
-#         .has("person", "uid", uid_value)
-#         .values(property_label)
-#         .next()
-#     )
+# %%
+'''
+property_label could be one of the following options:
+    "name"
+    "phone"
+    "title"
+    "mailing_address"
+    "interest_areas"
+    "lead_source"
+    "event_name"
+'''
 
 
-# # %%
+# Search by UID for a unique person to get a specific property value:
+def get_unique_person_property(g: GraphTraversalSource, uid_value: str, property_label: str):
+    return (
+        g.V()
+        .has("person", "uid", uid_value)
+        .values(property_label)
+        .next()
+    )
+
+
+# %%
 # test_unique_person = get_unique_person_property(g, "craig.lower@truepill.com", "lead_source")
 # print(test_unique_person)
 
 
-# # %% Search by name for possibly multiple people to get a specific property value:
-# def get_peoples_property_by_name(g: GraphTraversalSource, name_value: str, property_label: str):
-#     return (
-#         g.V()
-#         .has("person", "name", name_value)
-#         .values(property_label)
-#         .dedup()
-#         .toList()
-#     )
+# %% Search by name for possibly multiple people to get a specific property value:
+def get_peoples_property_by_name(g: GraphTraversalSource, name_value: str, property_label: str):
+    return (
+        g.V()
+        .has("person", "name", name_value)
+        .values(property_label)
+        .dedup()
+        .toList()
+    )
 
 
 # # %%
 # test_people = get_peoples_property_by_name(g, "Suisha T", "email")
 # print(test_people)
+
+
+# %%
+def fix_property_value(
+    g: GraphTraversalSource,
+    label: str,
+    uid_value: str,
+    target_property_key: str,
+    new_value: str
+):
+    print(f"fixing {target_property_key} for {label}")
+    return (
+        g.V()
+        .has(label, 'uid', uid_value)
+        .property(Cardinality.single, target_property_key, new_value)
+        .iterate()
+    )
+
+
+# %%
+def get_path(g: GraphTraversalSource):
+    return (
+        g.V()
+        .hasLabel("person")
+        .project('person', 'keywords')
+        .by('name')
+        .by(__.out('interested_in')
+        .hasLabel('keyword')
+        .values('name')
+        .fold())
+    )
+
 
 # # %%
 # file_path = 'data/2019-2023_Leads_List_Test.csv'
