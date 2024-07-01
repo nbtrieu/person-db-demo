@@ -1,10 +1,10 @@
 config.json
 
 # Ignore files (but not sub-folders) in the data folder
-data/**
-!data/**/
-!data/**/.gitkeep
-!data/README.md
+app/data/**
+!app/data/**/
+!app/data/**/.gitkeep
+!app/data/README.md
 
 # Ignore files (but not sub-folders) in the logs folder
 logs/**
