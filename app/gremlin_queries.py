@@ -166,7 +166,7 @@ def add_organizations(g: GraphTraversalSource, unique_organizations_df: pd.DataF
         organization_uid_value = row.get("Organization").strip().lower().capitalize()  # Normalize the organization name
 
         organization_properties = {
-            Organization.PropertyKey.UID: organization_uid_value,
+            Organization.PropertyKey.UUID: organization_uid_value,
             Organization.PropertyKey.NAME: row.get("Organization"),
             # Organization.PropertyKey.DOMAIN: domain_value,
             # Organization.PropertyKey.ACRONYM: acronym_value,

@@ -3,8 +3,14 @@ class Organization:
     LABEL = "organization"
 
     class PropertyKey:
-        UID = "uid"  # same as name
+        UUID = "uuid"
         NAME = "name"
-        # DOMAIN = "domain"
-        # ACRONYM = "acronym"
+        INDUSTRY = "industry"
+        DESCRIPTION = "description"
+        LOCATION = "location"
         MAILING_ADDRESS = "mailing_address"
+        WEBSITE = "website"
+        DOMAIN = "domain"
+        LINKEDIN_URL = "linkedin_url"
+        SPECIALTIES = "specialties"
+        SIZE = "size"
