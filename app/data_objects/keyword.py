@@ -3,5 +3,11 @@ class Keyword:
     LABEL = "keyword"
 
     class PropertyKey:
-        UID = "uid"  # same as name
+        UUID = "uuid"
         NAME = "name"
+        TYPE = "type"
+        DESCRIPTION = "description"
+        SYNONYMS = "synonyms"
+        INDUSTRY = "industry"
+        CREATED_AT = "created_at"
+        LAST_UPDATED_AT = "last_updated_at"

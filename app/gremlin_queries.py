@@ -217,7 +217,7 @@ def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):  # 
     ):
         keyword_name_value = row.get("Keyword")
         keyword_properties = {
-            Keyword.PropertyKey.UID: keyword_name_value,
+            Keyword.PropertyKey.UUID: keyword_name_value,
             Keyword.PropertyKey.NAME: keyword_name_value
         }
 
