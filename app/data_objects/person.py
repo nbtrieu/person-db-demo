@@ -17,6 +17,6 @@ class Person:
         INTEREST_AREAS = "interest_areas"
         LEAD_SOURCE = "lead_source"
         EVENT_NAME = "event_name"
-        INGESTION_TAG = "ingestion_tag"
         PURCHASING_AGENT = "purchasing_agent"
         VALIDATED_LEAD_STATUS = "validated_lead_status"
+        INGESTION_TAG = "ingestion_tag"
