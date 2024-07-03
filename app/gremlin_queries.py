@@ -25,6 +25,7 @@ from gremlin_python.process.traversal import (
     WithOptions,
 )
 from tqdm import tqdm
+from datetime import datetime, timezone
 from database import BulkQueryExecutor
 from data_objects import Person, Organization, Keyword
 
@@ -121,7 +122,6 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
         total=contact_df.shape[0],
         desc="Importing People"
     ):
-
         person_properties = {
             Person.PropertyKey.UUID: row.get("UUID"),
             ** ({Person.PropertyKey.FIRST_NAME: row["First Name"]} if "First Name" in contact_df.columns and not pd.isnull(row.get("First Name")) else {}),
@@ -150,15 +150,7 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
     query_executor.force_execute()
 
 
-def extract_unique_organizations(contact_df: pd.DataFrame):
-    contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
-    unique_organizations_series = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
-    unique_organizations_df = unique_organizations_series.to_frame()
-    print("unique_organizations_df:\n", unique_organizations_df)
-    return unique_organizations_df
-
-
-def add_organizations(g: GraphTraversalSource, unique_organizations_df: pd.DataFrame):  # organization_df derived from 'Organization' column of contact_df
+def add_organizations(g: GraphTraversalSource, unique_organizations_df: pd.DataFrame):
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
@@ -166,14 +158,18 @@ def add_organizations(g: GraphTraversalSource, unique_organizations_df: pd.DataF
         total=unique_organizations_df.shape[0],
         desc="Importing Organizations"
     ):
-        organization_uuid_value = row.get("Organization").strip().lower().capitalize()  # Normalize the organization name
-
         organization_properties = {
-            Organization.PropertyKey.UUID: organization_uuid_value,
+            Organization.PropertyKey.UUID: row.get("UUID"),
             Organization.PropertyKey.NAME: row.get("Organization"),
-            # Organization.PropertyKey.DOMAIN: domain_value,
-            # Organization.PropertyKey.ACRONYM: acronym_value,
-            ** ({Organization.PropertyKey.MAILING_ADDRESS: row["Organization's Mailing Address"]} if "Organization's Mailing Address" in unique_organizations_df.columns and not pd.isnull(row.get("Organization's Mailing Address")) else {})
+            **({Organization.PropertyKey.INDUSTRY: row["Industry"]} if "Industry" in unique_organizations_df.columns and not pd.isnull(row.get("Industry")) else {}),
+            **({Organization.PropertyKey.DESCRIPTION: row["Description"]} if "Description" in unique_organizations_df.columns and not pd.isnull(row.get("Description")) else {}),
+            **({Organization.PropertyKey.LOCATION: row["Location"]} if "Location" in unique_organizations_df.columns and not pd.isnull(row.get("Location")) else {}),
+            **({Organization.PropertyKey.MAILING_ADDRESS: row["Organization's Mailing Address"]} if "Organization's Mailing Address" in unique_organizations_df.columns and not pd.isnull(row.get("Organization's Mailing Address")) else {}),
+            **({Organization.PropertyKey.WEBSITE: row["Website"]} if "Website" in unique_organizations_df.columns and not pd.isnull(row.get("Website")) else {}),
+            **({Organization.PropertyKey.DOMAIN: row["Domain"]} if "Domain" in unique_organizations_df.columns and not pd.isnull(row.get("Domain")) else {}),
+            **({Organization.PropertyKey.LINKEDIN_URL: row["LinkedIn URL"]} if "LinkedIn URL" in unique_organizations_df.columns and not pd.isnull(row.get("LinkedIn URL")) else {}),
+            **({Organization.PropertyKey.SPECIALTIES: row["Specialties"]} if "Specialties" in unique_organizations_df.columns and not pd.isnull(row.get("Specialties")) else {}),
+            **({Organization.PropertyKey.SIZE: row["Size"]} if "Size" in unique_organizations_df.columns and not pd.isnull(row.get("Size")) else {})
         }
 
         query_executor.add_vertex(
@@ -184,33 +180,7 @@ def add_organizations(g: GraphTraversalSource, unique_organizations_df: pd.DataF
     query_executor.force_execute()
 
 
-def process_keywords(interests_row_value: str) -> list:
-    keywords_to_be_added = []
-
-    if ',' in interests_row_value:
-        keywords_to_be_added.extend([keyword.strip() for keyword in interests_row_value.split(',')])
-    else:
-        keywords_to_be_added(interests_row_value.strip())
-
-    return keywords_to_be_added
-
-
-def extract_unique_keywords(contact_df: pd.DataFrame):
-    ignore_list = ["- None -", "N/A", "null"]
-
-    all_keywords = []
-    for interests in contact_df["Area of Interests"].dropna():
-        keywords = [keyword.strip() for keyword in interests.split(',') if keyword.strip() not in ignore_list]
-        all_keywords.extend(keywords)
-
-    unique_keywords = list(set(all_keywords))
-
-    unique_keywords_df = pd.DataFrame(unique_keywords, columns=["Keyword"])
-
-    return unique_keywords_df
-
-
-def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):  # keyword_df derived from 'Area of Interests' column of contact_df
+def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
@@ -218,10 +188,17 @@ def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):  # 
         total=unique_keywords_df.shape[0],
         desc="Importing Keywords"
     ):
-        keyword_name_value = row.get("Keyword")
+        current_time = datetime.now(timezone.utc).isoformat()
+
         keyword_properties = {
-            Keyword.PropertyKey.UUID: keyword_name_value,
-            Keyword.PropertyKey.NAME: keyword_name_value
+            Keyword.PropertyKey.UUID: row.get("UUID"),
+            Keyword.PropertyKey.NAME: row.get("Keyword"),
+            **({Keyword.PropertyKey.TYPE: row["Type"]} if "Type" in unique_keywords_df.columns and not pd.isnull(row.get("Type")) else {}),
+            **({Keyword.PropertyKey.DESCRIPTION: row["Description"]} if "Description" in unique_keywords_df.columns and not pd.isnull(row.get("Description")) else {}),
+            **({Keyword.PropertyKey.SYNONYMS: row["Synonyms"]} if "Synonyms" in unique_keywords_df.columns and not pd.isnull(row.get("Synonyms")) else {}),
+            **({Keyword.PropertyKey.INDUSTRY: row["Industry"]} if "Industry" in unique_keywords_df.columns and not pd.isnull(row.get("Industry")) else {}),
+            Keyword.PropertyKey.CREATED_AT: current_time,
+            Keyword.PropertyKey.LAST_UPDATED_AT: current_time
         }
 
         query_executor.add_vertex(
@@ -246,7 +223,7 @@ def add_edges_person_organization(
         total=cleaned_org_contact_df.shape[0],
         desc="Adding person-organization edges"
     ):
-        person_uuid_value = row["Email"] if pd.notnull(row["Email"]) else "_".join([row["Full Name"], row["Organization"]]).replace(" ", "_").lower()
+        person_uuid_value = row["UUID"] if pd.notnull(row["Email"]) else "_".join([row["Full Name"], row["Organization"]]).replace(" ", "_").lower()
         organization_uuid_value = row.get("Organization").strip().lower().capitalize()
 
         person_graph_id = person_id_dict.get(person_uuid_value)

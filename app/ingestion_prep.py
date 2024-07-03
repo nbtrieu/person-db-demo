@@ -58,7 +58,27 @@ def harmonize_column_titles(df: pd.DataFrame) -> pd.DataFrame:
         "Title": "Title",
         "title": "Title",
         "Organization": "Organization",
+        "Organisation": "Organization",
         "organization": "Organization",
+        "organisation": "Organization",
+        "Industry": "Industry",
+        "industry": "Industry",
+        "Description": "Description",
+        "description": "Description",
+        "Location": "Location",
+        "location": "Location",
+        "Organization's Mailing Address": "Organization's Mailing Address",
+        "organization's mailing address": "Organization's Mailing Address",
+        "Website": "Website",
+        "website": "Website",
+        "Domain": "Domain",
+        "domain": "Domain",
+        "LinkedIn URL": "LinkedIn URL",
+        "linkedin url": "LinkedIn URL",
+        "Specialties": "Specialties",
+        "specialties": "Specialties",
+        "Size": "Size",
+        "size": "Size",
         "Interest Areas": "Interest Areas",
         "Areas of Interest": "Interest Areas",
         "Area of Interests": "Interest Areas",
@@ -74,9 +94,24 @@ def harmonize_column_titles(df: pd.DataFrame) -> pd.DataFrame:
         "Validated Lead Status": "Validated Lead Status",
         "validated_lead_status": "Validated Lead Status",
         "Ingestion Tag": "Ingestion Tag",
-        "ingestion_tag": "Ingestion Tag"
+        "ingestion_tag": "Ingestion Tag",
+        "Keyword": "Keyword",
+        "keyword": "keyword",
+        "Name": "Name",
+        "name": "Name",
+        "Type": "Type",
+        "type": "Type",
+        "Description": "Description",
+        "description": "Description",
+        "Synonyms": "Synonyms",
+        "synonyms": "Synonyms",
+        "Industry": "Industry",
+        "industry": "Industry",
+        "Created At": "Created At",
+        "created_at": "Created At",
+        "Last Updated At": "Last Updated At",
+        "last_updated_at": "Last Updated At"
     }
-    
 
     # Rename the columns in the DataFrame
     df = df.rename(columns=column_mapping)
@@ -109,16 +144,66 @@ def add_ingestion_tag_column(df: pd.DataFrame, tag: str) -> pd.DataFrame:
     return df
 
 
-def prep_df(file_name: str, tag: str):
-    contact_df = pd.read_csv('data/' + file_name)
+def process_keywords(interests_row_value: str) -> list:
+    keywords_to_be_added = []
+
+    if ',' in interests_row_value:
+        keywords_to_be_added.extend([keyword.strip() for keyword in interests_row_value.split(',')])
+    else:
+        keywords_to_be_added(interests_row_value.strip())
+
+    return keywords_to_be_added
+
+
+def extract_unique_keywords(contact_df: pd.DataFrame):
+    ignore_list = ["- None -", "N/A", "null"]
+
+    all_keywords = []
+    for interests in contact_df["Interest Areas"].dropna():
+        keywords = [keyword.strip() for keyword in interests.split(',') if keyword.strip() not in ignore_list]
+        all_keywords.extend(keywords)
+
+    unique_keywords = list(set(all_keywords))
+
+    unique_keywords_df = pd.DataFrame(unique_keywords, columns=["Keyword"])
+
+    return unique_keywords_df
+
+
+def prep_person_df(file_name: str, tag: str):
+    person_df = pd.read_csv('data/' + file_name).drop_duplicates()
+    person_df = harmonize_column_titles(person_df)
+    person_df = add_uuid_column(person_df)
+    person_df = add_ingestion_tag_column(person_df, tag)
+    person_df.to_csv('data/prepped_' + file_name, index=False)
+
+
+def prep_organization_df(file_name: str):
+    contact_df = pd.read_csv('data/' + file_name).drop_duplicates()
+    contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
+    unique_organizations_series = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
+    unique_organizations_df = unique_organizations_series.to_frame()
+    unique_organizations_df = harmonize_column_titles(unique_organizations_df)
+    unique_organizations_df = add_uuid_column(unique_organizations_df)
+    unique_organizations_df.to_csv('data/organization_list.csv', index=False)
+
+
+def prep_keyword_df(file_name: str):
+    contact_df = pd.read_csv('data/' + file_name).drop_duplicates()
     contact_df = harmonize_column_titles(contact_df)
-    contact_df = add_uuid_column(contact_df)
-    contact_df = add_ingestion_tag_column(contact_df, tag)
-    contact_df.to_csv('data/prepped_' + file_name, index=False)
+    unique_keywords_df = extract_unique_keywords(contact_df)
+    unique_keywords_df = add_uuid_column(unique_keywords_df)
+    unique_keywords_df.to_csv('data/keyword_list.csv', index=False)
 
 
 # %%
-prep_df('2019-2023_Leads_List_Test_deduped.csv', '2019-23')
+# prep_person_df('2019-2023_Leads_List_Test_deduped.csv', '2019-23')
+
+# %%
+# prep_organization_df('2019-2023_Leads_List_Test_deduped.csv')
+
+# %%
+prep_keyword_df('2019-2023_Leads_List_Test_deduped.csv')
 
 # %%
 table1_path = 'data/qiagen_rneasy.csv'
