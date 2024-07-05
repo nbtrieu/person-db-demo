@@ -98,22 +98,6 @@ def check_node_properties(g: GraphTraversalSource, label: str, property_key: str
     return properties
 
 
-def create_id_dict(g: GraphTraversalSource, vertex_label: str):
-    node_list = (
-        g.V()
-        .has_label(vertex_label)
-        .project("id", "uuid")
-        .by(__.id_())
-        .by(__.values("uuid"))
-        .to_list()
-    )
-    id_dict = {
-        node["uuid"]: node["id"] for node in node_list
-    }
-
-    return id_dict
-
-
 def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
     query_executor = BulkQueryExecutor(g, 100)
 
@@ -159,7 +143,7 @@ def add_organizations(g: GraphTraversalSource, unique_organizations_df: pd.DataF
         desc="Importing Organizations"
     ):
         organization_properties = {
-            Organization.PropertyKey.UUID: row.get("UUID"),
+            Organization.PropertyKey.UUID: row.get("Organization"),
             Organization.PropertyKey.NAME: row.get("Organization"),
             **({Organization.PropertyKey.INDUSTRY: row["Industry"]} if "Industry" in unique_organizations_df.columns and not pd.isnull(row.get("Industry")) else {}),
             **({Organization.PropertyKey.DESCRIPTION: row["Description"]} if "Description" in unique_organizations_df.columns and not pd.isnull(row.get("Description")) else {}),
@@ -191,7 +175,7 @@ def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):
         current_time = datetime.now(timezone.utc).isoformat()
 
         keyword_properties = {
-            Keyword.PropertyKey.UUID: row.get("UUID"),
+            Keyword.PropertyKey.UUID: row.get("Keyword"),
             Keyword.PropertyKey.NAME: row.get("Keyword"),
             **({Keyword.PropertyKey.TYPE: row["Type"]} if "Type" in unique_keywords_df.columns and not pd.isnull(row.get("Type")) else {}),
             **({Keyword.PropertyKey.DESCRIPTION: row["Description"]} if "Description" in unique_keywords_df.columns and not pd.isnull(row.get("Description")) else {}),
@@ -209,21 +193,37 @@ def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):
     query_executor.force_execute()
 
 
+def create_id_dict(g: GraphTraversalSource, vertex_label: str, property_key: str):
+    node_list = (
+        g.V()
+        .has_label(vertex_label)
+        .project("id", property)
+        .by(__.id_())
+        .by(__.values(property))
+        .to_list()
+    )
+    id_dict = {
+        node[property_key]: node["id"] for node in node_list
+    }
+
+    return id_dict
+
+
 def add_edges_person_organization(
     g: GraphTraversalSource,
-    cleaned_org_contact_df: pd.DataFrame,
+    prepped_person_df: pd.DataFrame,
 ):
     query_executor = BulkQueryExecutor(g, 100)
 
-    person_id_dict = create_id_dict(g, "person")
-    organization_id_dict = create_id_dict(g, "organization")
+    person_id_dict = create_id_dict(g, "person", "uuid")
+    organization_id_dict = create_id_dict(g, "organization", "uuid")
 
     for _, row in tqdm(
-        cleaned_org_contact_df.iterrows(),
-        total=cleaned_org_contact_df.shape[0],
+        prepped_person_df.iterrows(),
+        total=prepped_person_df.shape[0],
         desc="Adding person-organization edges"
     ):
-        person_uuid_value = row["UUID"] if pd.notnull(row["Email"]) else "_".join([row["Full Name"], row["Organization"]]).replace(" ", "_").lower()
+        person_uuid_value = row["UUID"]
         organization_uuid_value = row.get("Organization").strip().lower().capitalize()
 
         person_graph_id = person_id_dict.get(person_uuid_value)

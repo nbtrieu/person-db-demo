@@ -1,6 +1,7 @@
 # %%
 import pandas as pd
 import uuid
+import numpy as np
 
 
 def remove_overlaps(table1_path: str, table2_path: str, new_table2_path: str):
@@ -179,22 +180,68 @@ def prep_person_df(file_name: str, tag: str):
 
 
 def prep_organization_df(file_name: str):
-    contact_df = pd.read_csv('data/' + file_name).drop_duplicates()
-    contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
-    unique_organizations_series = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
+    person_df = pd.read_csv('data/' + file_name).drop_duplicates()
+    # person_df['Organization'] = person_df['Organization'].str.strip().str.lower().str.title()
+    unique_organizations_series = person_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
     unique_organizations_df = unique_organizations_series.to_frame()
     unique_organizations_df = harmonize_column_titles(unique_organizations_df)
-    unique_organizations_df = add_uuid_column(unique_organizations_df)
     unique_organizations_df.to_csv('data/organization_list.csv', index=False)
 
 
 def prep_keyword_df(file_name: str):
-    contact_df = pd.read_csv('data/' + file_name).drop_duplicates()
-    contact_df = harmonize_column_titles(contact_df)
-    unique_keywords_df = extract_unique_keywords(contact_df)
-    unique_keywords_df = add_uuid_column(unique_keywords_df)
+    person_df = pd.read_csv('data/' + file_name).drop_duplicates()
+    person_df = harmonize_column_titles(person_df)
+    unique_keywords_df = extract_unique_keywords(person_df)
     unique_keywords_df.to_csv('data/keyword_list.csv', index=False)
 
+
+def prep_person_keyword_df(file_name: str):
+    prepped_person_df = pd.read_csv('data/prepped_' + file_name)
+    prepped_person_df = harmonize_column_titles(prepped_person_df)
+    prepped_person_df['Interest Areas'].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
+    prepped_person_df = prepped_person_df.dropna(subset=['Interest Areas'])
+
+
+# Function to standardize the organization names for matching
+def standardize_organization(s):
+    if pd.isnull(s):
+        return s
+    return ' '.join(word.capitalize() for word in s.lower().split())
+
+
+def add_org_uuid_column(file_name: str):
+    # Load prepped_person and organization_list DataFrames
+    prepped_person_df = pd.read_csv('data/prepped_' + file_name)
+    organization_df = pd.read_csv('data/organization_list.csv')
+
+    # Create standardized columns for matching
+    prepped_person_df['Organization_match'] = prepped_person_df['Organization'].apply(standardize_organization)
+    organization_df['Organization_match'] = organization_df['Organization'].apply(standardize_organization)
+
+    # Merge the DataFrames on the Organization column
+    merged_df = pd.merge(prepped_person_df, organization_df, on="Organization", how="left", suffixes=('', '_org'))
+
+    # Rename the UUID_org column to Organization UUID
+    merged_df = merged_df.rename(columns={"UUID_org": "Organization UUID"})
+    
+    # Drop the temporary matching columns
+    # merged_df = merged_df.drop(columns=['Organization_match', 'Organization_match_org'])
+
+    # Reorder columns to place Organization UUID immediately after Organization
+    org_idx = merged_df.columns.get_loc("Organization") + 1
+    cols = merged_df.columns.tolist()
+    cols.insert(org_idx, cols.pop(cols.index("Organization UUID")))
+    merged_df = merged_df[cols]
+
+    # Display the merged DataFrame
+    print(merged_df)
+
+    # Save the updated DataFrame to a new CSV file
+    merged_df.to_csv('data/updated_person_df_with_org_uuid.csv', index=False)
+
+
+# %%
+add_org_uuid_column('2019-2023_Leads_List_Test_deduped.csv')
 
 # %%
 # prep_person_df('2019-2023_Leads_List_Test_deduped.csv', '2019-23')
@@ -203,7 +250,7 @@ def prep_keyword_df(file_name: str):
 # prep_organization_df('2019-2023_Leads_List_Test_deduped.csv')
 
 # %%
-prep_keyword_df('2019-2023_Leads_List_Test_deduped.csv')
+# prep_keyword_df('2019-2023_Leads_List_Test_deduped.csv')
 
 # %%
 table1_path = 'data/qiagen_rneasy.csv'
