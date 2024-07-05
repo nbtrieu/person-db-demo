@@ -5,6 +5,7 @@ class Organization:
     class PropertyKey:
         UUID = "uuid"
         NAME = "name"
+        DISPLAY_NAME = "display_name"
         INDUSTRY = "industry"
         DESCRIPTION = "description"
         LOCATION = "location"

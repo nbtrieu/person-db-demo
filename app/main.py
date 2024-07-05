@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
-from gremlin_queries import get_path, fix_property_value, add_keywords, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, drop_nodes, drop_edges, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, get_names, get_people_by_keyword
+from gremlin_queries import get_path, fix_property_value, add_organizations, add_keywords, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, drop_nodes, drop_edges, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, get_names, get_people_by_keyword
 import asyncio
 import database_connection
 import pandas as pd
@@ -40,8 +40,8 @@ async def app_startup():
     # unique_organizations_df = pd.read_csv('data/organization_list.csv')
     # add_organizations(g, unique_organizations_df)
 
-    # unique_keywords_df = pd.read_csv('data/keyword_list.csv')
-    # add_keywords(g, unique_keywords_df)
+    unique_keywords_df = pd.read_csv('data/keyword_list.csv')
+    add_keywords(g, unique_keywords_df)
 
     # EDGE CREATION:
     # contact_df['Interest Areas'].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
@@ -71,7 +71,7 @@ async def app_startup():
 
     # DROP NODES/EDGES BY LABEL:
     # await asyncio.to_thread(
-    #     drop_nodes, g, 'keyword'
+    #     drop_nodes, g, 'organization'
     # )
     # await asyncio.to_thread(
     #     drop_edges, g, 'affiliated_with'
@@ -87,7 +87,7 @@ async def app_startup():
     #     check_node_properties, g, 'person', 'email', 'ngreenidge26@gmail.com'
     # )
     # node_properties = await asyncio.to_thread(
-    #     check_node_properties, g, 'organization', 'name', 'Seegene Inc.'
+    #     check_node_properties, g, 'organization', 'display_name', 'SML Genetree Co. Ltd'
     # )
     node_properties = await asyncio.to_thread(
         check_node_properties, g, 'keyword', 'name', 'NGS'

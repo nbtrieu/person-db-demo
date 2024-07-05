@@ -143,8 +143,9 @@ def add_organizations(g: GraphTraversalSource, unique_organizations_df: pd.DataF
         desc="Importing Organizations"
     ):
         organization_properties = {
-            Organization.PropertyKey.UUID: row.get("Organization"),
-            Organization.PropertyKey.NAME: row.get("Organization"),
+            Organization.PropertyKey.UUID: row.get("Organization Standardized Name"),
+            Organization.PropertyKey.NAME: row.get("Organization Standardized Name"),
+            Organization.PropertyKey.DISPLAY_NAME: row.get("Display Name"),
             **({Organization.PropertyKey.INDUSTRY: row["Industry"]} if "Industry" in unique_organizations_df.columns and not pd.isnull(row.get("Industry")) else {}),
             **({Organization.PropertyKey.DESCRIPTION: row["Description"]} if "Description" in unique_organizations_df.columns and not pd.isnull(row.get("Description")) else {}),
             **({Organization.PropertyKey.LOCATION: row["Location"]} if "Location" in unique_organizations_df.columns and not pd.isnull(row.get("Location")) else {}),
@@ -223,8 +224,8 @@ def add_edges_person_organization(
         total=prepped_person_df.shape[0],
         desc="Adding person-organization edges"
     ):
-        person_uuid_value = row["UUID"]
-        organization_uuid_value = row.get("Organization").strip().lower().capitalize()
+        person_uuid_value = row.get("UUID")
+        organization_uuid_value = row["Organization"].str.strip().str.lower()
 
         person_graph_id = person_id_dict.get(person_uuid_value)
         organization_graph_id = organization_id_dict.get(organization_uuid_value)

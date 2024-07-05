@@ -62,6 +62,7 @@ def harmonize_column_titles(df: pd.DataFrame) -> pd.DataFrame:
         "Organisation": "Organization",
         "organization": "Organization",
         "organisation": "Organization",
+        "Organization Standardized Name": "Organization Standardized Name",
         "Industry": "Industry",
         "industry": "Industry",
         "Description": "Description",
@@ -180,11 +181,31 @@ def prep_person_df(file_name: str, tag: str):
 
 
 def prep_organization_df(file_name: str):
-    person_df = pd.read_csv('data/' + file_name).drop_duplicates()
-    # person_df['Organization'] = person_df['Organization'].str.strip().str.lower().str.title()
-    unique_organizations_series = person_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
+    person_df = pd.read_csv('data/prepped_' + file_name).drop_duplicates()
+    person_df['Organization Standardized Name'] = person_df['Organization'].str.strip().str.lower()
+    
+    # Create a DataFrame with original and standardized organization names
+    original_organizations_df = person_df[['Organization Standardized Name', 'Organization']].drop_duplicates()
+    
+    # Keep the original formatting for the display name
+    original_organizations_df = original_organizations_df.rename(columns={"Organization": "Display Name"})
+    
+    # Get unique standardized organization names
+    unique_organizations_series = person_df['Organization Standardized Name'].dropna().drop_duplicates().reset_index(drop=True)
+    
+    # Convert to DataFrame
     unique_organizations_df = unique_organizations_series.to_frame()
+    
+    # Harmonize column titles
     unique_organizations_df = harmonize_column_titles(unique_organizations_df)
+    
+    # Merge to add the Display Name column
+    unique_organizations_df = pd.merge(unique_organizations_df, original_organizations_df, on='Organization Standardized Name', how='left')
+    
+    # Remove rows with duplicate values for the "Organization Standardized Name"
+    unique_organizations_df = unique_organizations_df.drop_duplicates(subset='Organization Standardized Name')
+    
+    # Save to CSV
     unique_organizations_df.to_csv('data/organization_list.csv', index=False)
 
 
@@ -202,52 +223,11 @@ def prep_person_keyword_df(file_name: str):
     prepped_person_df = prepped_person_df.dropna(subset=['Interest Areas'])
 
 
-# Function to standardize the organization names for matching
-def standardize_organization(s):
-    if pd.isnull(s):
-        return s
-    return ' '.join(word.capitalize() for word in s.lower().split())
-
-
-def add_org_uuid_column(file_name: str):
-    # Load prepped_person and organization_list DataFrames
-    prepped_person_df = pd.read_csv('data/prepped_' + file_name)
-    organization_df = pd.read_csv('data/organization_list.csv')
-
-    # Create standardized columns for matching
-    prepped_person_df['Organization_match'] = prepped_person_df['Organization'].apply(standardize_organization)
-    organization_df['Organization_match'] = organization_df['Organization'].apply(standardize_organization)
-
-    # Merge the DataFrames on the Organization column
-    merged_df = pd.merge(prepped_person_df, organization_df, on="Organization", how="left", suffixes=('', '_org'))
-
-    # Rename the UUID_org column to Organization UUID
-    merged_df = merged_df.rename(columns={"UUID_org": "Organization UUID"})
-    
-    # Drop the temporary matching columns
-    # merged_df = merged_df.drop(columns=['Organization_match', 'Organization_match_org'])
-
-    # Reorder columns to place Organization UUID immediately after Organization
-    org_idx = merged_df.columns.get_loc("Organization") + 1
-    cols = merged_df.columns.tolist()
-    cols.insert(org_idx, cols.pop(cols.index("Organization UUID")))
-    merged_df = merged_df[cols]
-
-    # Display the merged DataFrame
-    print(merged_df)
-
-    # Save the updated DataFrame to a new CSV file
-    merged_df.to_csv('data/updated_person_df_with_org_uuid.csv', index=False)
-
-
-# %%
-add_org_uuid_column('2019-2023_Leads_List_Test_deduped.csv')
-
 # %%
 # prep_person_df('2019-2023_Leads_List_Test_deduped.csv', '2019-23')
 
 # %%
-# prep_organization_df('2019-2023_Leads_List_Test_deduped.csv')
+prep_organization_df('2019-2023_Leads_List_Test_deduped.csv')
 
 # %%
 # prep_keyword_df('2019-2023_Leads_List_Test_deduped.csv')
