@@ -93,10 +93,13 @@ def harmonize_column_titles(df: pd.DataFrame) -> pd.DataFrame:
         "specialties": "Specialties",
         "Size": "Size",
         "size": "Size",
-        "Interest Areas": "Interest Areas",
-        "Areas of Interest": "Interest Areas",
-        "Area of Interests": "Interest Areas",
-        "interest_areas": "Interest Areas",
+        "Keywords": "Keywords",
+        "Keyword": "Keywords",
+        "Interest Areas": "Keywords",
+        "Areas of Interest": "Keywords",
+        "Area of Interests": "Keywords",
+        "Zymo Research Keywords Found": "Keywords",
+        "interest_areas": "Keywords",
         "Lead Source": "Lead Source",
         "lead_source": "Lead Source",
         "Event Name": "Event Name",
@@ -174,13 +177,13 @@ def extract_unique_keywords(contact_df: pd.DataFrame):
     ignore_list = ["- None -", "N/A", "null"]
 
     all_keywords = []
-    for interests in contact_df["Interest Areas"].dropna():
+    for interests in contact_df["Keywords"].dropna():
         keywords = [keyword.strip() for keyword in interests.split(',') if keyword.strip() not in ignore_list]
         all_keywords.extend(keywords)
 
     unique_keywords = list(set(all_keywords))
 
-    unique_keywords_df = pd.DataFrame(unique_keywords, columns=["Keyword"])
+    unique_keywords_df = pd.DataFrame(unique_keywords, columns=["Keywords"])
 
     return unique_keywords_df
 
@@ -253,7 +256,7 @@ prep_keyword_df(file_name=file_name)
 prep_edges_df(file_name=file_name, column_name="Organization", target_node_label="organization")
 
 # %%
-prep_edges_df(file_name=file_name, column_name="Interest Areas", target_node_label="keyword")
+prep_edges_df(file_name=file_name, column_name="Keywords", target_node_label="keyword")
 
 # %%
 table1_path = 'data/qiagen_rneasy.csv'

@@ -121,7 +121,7 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
             ** ({Person.PropertyKey.ORGANIZATION: row["Organization"]} if "Organization" in contact_df.columns and not pd.isnull(row.get("Organization")) else {}),
             ** ({Person.PropertyKey.PREVIOUS_ORGANIZATIONS: row["Previous Organizations"]} if "Previous Organizations" in contact_df.columns and not pd.isnull(row.get("Previous Organizations")) else {}),
             ** ({Person.PropertyKey.TENTATIVE_ORGANIZATIONS: row["Tentative Organizations"]} if "Tentative Organizations" in contact_df.columns and not pd.isnull(row.get("Tentative Organizations")) else {}),
-            ** ({Person.PropertyKey.INTEREST_AREAS: row["Interest Areas"]} if "Interest Areas" in contact_df.columns and not pd.isnull(row.get("Interest Areas")) else {}),
+            ** ({Person.PropertyKey.INTEREST_AREAS: row["Keywords"]} if "Keywords" in contact_df.columns and not pd.isnull(row.get("Keywords")) else {}),
             ** ({Person.PropertyKey.LEAD_SOURCE: row["Lead Source"]} if "Lead Source" in contact_df.columns and not pd.isnull(row.get("Lead Source")) else {}),
             ** ({Person.PropertyKey.EVENT_NAME: row["Event Name"]} if "Event Name" in contact_df.columns and not pd.isnull(row.get("Event Name")) else {}),
             ** ({Person.PropertyKey.MAILING_ADDRESS: row["Mailing Address"]} if "Mailing Address" in contact_df.columns and not pd.isnull(row.get("Mailing Address")) else {}),
@@ -181,8 +181,8 @@ def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):
         current_time = datetime.now(timezone.utc).isoformat()
 
         keyword_properties = {
-            Keyword.PropertyKey.UUID: row.get("Keyword"),
-            Keyword.PropertyKey.NAME: row.get("Keyword"),
+            Keyword.PropertyKey.UUID: row.get("Keywords"),
+            Keyword.PropertyKey.NAME: row.get("Keywords"),
             **({Keyword.PropertyKey.TYPE: row["Type"]} if "Type" in unique_keywords_df.columns and not pd.isnull(row.get("Type")) else {}),
             **({Keyword.PropertyKey.DESCRIPTION: row["Description"]} if "Description" in unique_keywords_df.columns and not pd.isnull(row.get("Description")) else {}),
             **({Keyword.PropertyKey.SYNONYMS: row["Synonyms"]} if "Synonyms" in unique_keywords_df.columns and not pd.isnull(row.get("Synonyms")) else {}),
@@ -259,7 +259,7 @@ def add_edges_person_keyword(
         person_graph_id = person_id_dict.get(person_uuid_value)
 
         # This should be within the row loop to process each row's interests
-        interests = row["Interest Areas"]
+        interests = row["Keywords"]
         keywords = [keyword.strip() for keyword in interests.split(',')]
 
         for keyword in keywords:
@@ -271,104 +271,6 @@ def add_edges_person_keyword(
                 g.V(person_graph_id).addE("interested_in").to(__.V(keyword_graph_id)).iterate()
 
     query_executor.force_execute()
-
-
-# # %%
-# contact_df = pd.read_csv("data/2019-2023_Leads_List_Test_deduped.csv")
-
-# # %%
-# keywords = contact_df["Area of Interests"][18]
-# # print(keywords)
-# # print(type(keywords))
-# processed_keywords = process_keywords(keywords)
-# print(processed_keywords)
-
-# # %%
-# test_contact_df = pd.DataFrame({
-#     "Area of Interests": [
-#         "Sample Collection",
-#         "Assay Development, Epigenetics/NGS/RNA-Seq, Microbiomics, Sample Collection",
-#         None,  # Example of a row with no interests
-#         "- None -",
-#         "Microbiomics, Epigenetics/NGS/RNA-Seq",  # Duplicates to show removal
-#     ]
-# })
-
-# unique_keywords_df = extract_unique_keywords(test_contact_df)
-# print(unique_keywords_df)
-
-# # %%
-# unique_keywords_df = extract_unique_keywords(contact_df)
-# print(unique_keywords_df)
-
-# # %%
-# contact_df['Organization'] = contact_df['Organization'].str.strip().str.lower().str.title()
-
-# # Remove duplicates and drop rows with missing 'Organization' values
-# unique_organizations_series = contact_df['Organization'].dropna().drop_duplicates().reset_index(drop=True)
-
-# # Convert Pandas Series to DataFrame
-# unique_organizations_df = unique_organizations_series.to_frame()
-# print("unique_organizations_df:\n", unique_organizations_df)
-
-# # %% DataFrame containing non-null organization names for the purpose of edge creation between "person" and "organization" nodes:
-# cleaned_org_contact_df = contact_df.dropna(subset=['Organization']).reset_index(drop=True)
-# print("cleaned_org_contact_df:\n", cleaned_org_contact_df)
-
-# # %%
-# # %% DataFrame containing non-null "Area of Interests" values for the purpose of edge creation between "person" and "keyword" nodes:
-# # Replace "- None -", "N/A", "null" with numpy.nan
-# contact_df['Area of Interests'].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
-# cleaned_interests_contact_df = contact_df.dropna(subset=['Area of Interests']).reset_index(drop=True)
-# print("cleaned_interests_contact_df:\n", cleaned_interests_contact_df)
-
-# # %% VERTEX CREATION:
-# person_id_dict = add_people(g, contact_df)
-
-# # %%
-# file_path = './dicts/person_id_dict.pickle'
-# with open(file_path, 'wb') as handle:
-#     pickle.dump(person_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-# # %%
-# organization_id_dict = add_organizations(g, unique_organizations_df)
-
-# # %%
-# file_path = './dicts/organization_id_dict.pickle'
-# with open(file_path, 'wb') as handle:
-#     pickle.dump(organization_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-# # %%
-# keyword_id_dict = add_keywords(g, unique_keywords_df)
-# print(keyword_id_dict)
-
-# # %%
-# file_path = './dicts/keyword_id_dict.pickle'
-# with open(file_path, 'wb') as handle:
-#     pickle.dump(keyword_id_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-# # %% EDGE CREATION:
-# add_edges_person_keyword(g, cleaned_interests_contact_df, person_id_dict, keyword_id_dict)
-
-# # %%
-# add_edges_person_organization(g, cleaned_org_contact_df, person_id_dict, organization_id_dict)
-
-# # %% TESTING NODES:
-# # g.V().drop().iterate()
-# g.E().drop().iterate()
-
-# # %%
-# # g.V().count().next()
-# g.E().count().next()
-
-# # %%
-# check_node_properties(g, "person", "name", "Baback Gharizadeh")
-
-# # %%
-# check_node_properties(g, "organization", "name", "Truepill")
-
-# # %%
-# check_node_properties(g, "keyword", "name", "Sample Collection")  # DEBUG NEEDED: 'connected_nodes': []
 
 
 # %% QUERYING DATA:
