@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
-from gremlin_queries import get_path, fix_property_value, add_organizations, add_keywords, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, drop_nodes, drop_edges, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, get_names, get_people_by_keyword
+from gremlin_queries import get_path, fix_property_value, add_people, add_keywords, add_organizations, add_keywords, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, drop_nodes, drop_edges, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, get_names, get_people_by_keyword
 import asyncio
 import database_connection
 import pandas as pd
@@ -34,24 +34,24 @@ async def app_startup():
     g = database_connection.get_gremlin_client()
     
     # NODE CREATION:
-    # contact_df = pd.read_csv("data/prepped_2019-2023_Leads_List_Test_deduped.csv")
-    # add_people(g, contact_df)
+    file_name = '2019-2023_Leads_List_Test_deduped.csv'
+    
+    # person_df = pd.read_csv("data/prepped_" + file_name)
+    # add_people(g, person_df)
 
-    # unique_organizations_df = pd.read_csv('data/organization_list.csv')
+    # unique_organizations_df = pd.read_csv('data/organization_list_' + file_name)
     # add_organizations(g, unique_organizations_df)
 
-    unique_keywords_df = pd.read_csv('data/keyword_list.csv')
-    add_keywords(g, unique_keywords_df)
+    # unique_keywords_df = pd.read_csv('data/keyword_list_' + file_name)
+    # add_keywords(g, unique_keywords_df)
 
     # EDGE CREATION:
-    # contact_df['Interest Areas'].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
-    # cleaned_interests_contact_df = contact_df.dropna(subset=['Area of Interests']).reset_index(drop=True)
-    # print(cleaned_interests_contact_df)
-    # cleaned_interests_contact_df.to_csv('./data/cleaned_interests_contacts.csv', index=False)
-    # add_edges_person_keyword(g, cleaned_interests_contact_df)
+    # cleaned_keyword_person_df = pd.read_csv('data/cleaned_keyword_' + file_name)
+    # print(cleaned_keyword_person_df)
+    # add_edges_person_keyword(g, cleaned_keyword_person_df)
 
-    # cleaned_org_contact_df = contact_df.dropna(subset=['Organization']).reset_index(drop=True)
-    # add_edges_person_organization(g, cleaned_org_contact_df)
+    # cleaned_organization_person_df = pd.read_csv('data/cleaned_organization_' + file_name)
+    # add_edges_person_organization(g, cleaned_organization_person_df)
 
     # global node_count
     # global edge_count
@@ -77,24 +77,28 @@ async def app_startup():
     #     drop_edges, g, 'affiliated_with'
     # )
 
-    node_count = await asyncio.to_thread(
-        count_nodes_in_db, g, 'keyword'
+    # TESTING:
+    # node_count = await asyncio.to_thread(
+    #     count_nodes_in_db, g, 'keyword'
+    # )
+    edge_count = await asyncio.to_thread(
+        count_edges_in_db, g, 'affiliated_with'
     )
     # edge_count = await asyncio.to_thread(
-    #     count_edges_in_db, g, 'affiliated_with'
+    #     count_edges_in_db, g, 'interested_in'
     # )
-    # node_properties = await asyncio.to_thread(
-    #     check_node_properties, g, 'person', 'email', 'ngreenidge26@gmail.com'
-    # )
+    node_properties = await asyncio.to_thread(
+        check_node_properties, g, 'person', 'email', 'ngreenidge26@gmail.com'
+    )
     # node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'organization', 'display_name', 'SML Genetree Co. Ltd'
     # )
-    node_properties = await asyncio.to_thread(
-        check_node_properties, g, 'keyword', 'name', 'NGS'
-    )
+    # node_properties = await asyncio.to_thread(
+    #     check_node_properties, g, 'keyword', 'name', 'NGS'
+    # )
     # print('QUERY RESULT:', query_result)
-    print('NODE COUNT:', node_count)
-    # print('EDGE COUNT:', edge_count)
+    # print('NODE COUNT:', node_count)
+    print('EDGE COUNT:', edge_count)
     # print('NAME LIST:', name_list)
     print('NODE PROPERTIES:', node_properties)
 

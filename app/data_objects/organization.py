@@ -3,8 +3,8 @@ class Organization:
     LABEL = "organization"
 
     class PropertyKey:
-        UUID = "uuid"
-        NAME = "name"
+        UUID = "uuid"  # same as name
+        NAME = "name"  # all lowercase for standardization
         DISPLAY_NAME = "display_name"
         INDUSTRY = "industry"
         DESCRIPTION = "description"

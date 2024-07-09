@@ -3,7 +3,7 @@ class Keyword:
     LABEL = "keyword"
 
     class PropertyKey:
-        UUID = "uuid"
+        UUID = "uuid"  # same as name
         NAME = "name"
         TYPE = "type"
         DESCRIPTION = "description"

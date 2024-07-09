@@ -58,10 +58,22 @@ def harmonize_column_titles(df: pd.DataFrame) -> pd.DataFrame:
         "dob": "DOB",
         "Title": "Title",
         "title": "Title",
+        "Previous Titles": "Previous Titles",
+        "previous titles": "Previous Titles",
+        "previous_titles": "Previous Titles",
+        "previousTitles": "Previous Titles",
         "Organization": "Organization",
         "Organisation": "Organization",
         "organization": "Organization",
         "organisation": "Organization",
+        "Previous Organizations": "Previous Organizations",
+        "previous organizations": "Previous Organizations",
+        "previous_organizations": "Previous Organizations",
+        "previousOrganizations": "Previous Organizations",
+        "Tentative Organizations": "Tentative Organizations",
+        "tentative organizations": "Tentative Organizations",
+        "tentative_organizations": "Tentative Organizations",
+        "tentativeOrganizations": "Tentative Organizations",
         "Organization Standardized Name": "Organization Standardized Name",
         "Industry": "Industry",
         "industry": "Industry",
@@ -141,8 +153,9 @@ def add_uuid_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def add_ingestion_tag_column(df: pd.DataFrame, tag: str) -> pd.DataFrame:
+def add_ingestion_tag_and_data_source_columns(df: pd.DataFrame, tag: str, source: str) -> pd.DataFrame:
     df['Ingestion Tag'] = tag
+    df['Data Source'] = source
     return df
 
 
@@ -172,11 +185,11 @@ def extract_unique_keywords(contact_df: pd.DataFrame):
     return unique_keywords_df
 
 
-def prep_person_df(file_name: str, tag: str):
+def prep_person_df(file_name: str, tag: str, source: str):
     person_df = pd.read_csv('data/' + file_name).drop_duplicates()
     person_df = harmonize_column_titles(person_df)
     person_df = add_uuid_column(person_df)
-    person_df = add_ingestion_tag_column(person_df, tag)
+    person_df = add_ingestion_tag_and_data_source_columns(person_df, tag, source)
     person_df.to_csv('data/prepped_' + file_name, index=False)
 
 
@@ -206,31 +219,41 @@ def prep_organization_df(file_name: str):
     unique_organizations_df = unique_organizations_df.drop_duplicates(subset='Organization Standardized Name')
     
     # Save to CSV
-    unique_organizations_df.to_csv('data/organization_list.csv', index=False)
+    unique_organizations_df.to_csv('data/organization_list_' + file_name, index=False)
 
 
 def prep_keyword_df(file_name: str):
     person_df = pd.read_csv('data/' + file_name).drop_duplicates()
     person_df = harmonize_column_titles(person_df)
     unique_keywords_df = extract_unique_keywords(person_df)
-    unique_keywords_df.to_csv('data/keyword_list.csv', index=False)
+    unique_keywords_df.to_csv('data/keyword_list_' + file_name, index=False)
 
 
-def prep_person_keyword_df(file_name: str):
+def prep_edges_df(file_name: str, column_name: str, target_node_label: str):
     prepped_person_df = pd.read_csv('data/prepped_' + file_name)
     prepped_person_df = harmonize_column_titles(prepped_person_df)
-    prepped_person_df['Interest Areas'].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
-    prepped_person_df = prepped_person_df.dropna(subset=['Interest Areas'])
+    prepped_person_df[column_name].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
+    cleaned_df = prepped_person_df.dropna(subset=[column_name]).reset_index(drop=True)
+    cleaned_df.to_csv('data/cleaned_' + target_node_label + '_' + file_name, index=False)
 
 
 # %%
-# prep_person_df('2019-2023_Leads_List_Test_deduped.csv', '2019-23')
+file_name = '2019-2023_Leads_List_Test_deduped.csv'
 
 # %%
-prep_organization_df('2019-2023_Leads_List_Test_deduped.csv')
+prep_person_df(file_name=file_name, tag="2019-23", source="tradeshows")
 
 # %%
-# prep_keyword_df('2019-2023_Leads_List_Test_deduped.csv')
+prep_organization_df(file_name=file_name)
+
+# %%
+prep_keyword_df(file_name=file_name)
+
+# %%
+prep_edges_df(file_name=file_name, column_name="Organization", target_node_label="organization")
+
+# %%
+prep_edges_df(file_name=file_name, column_name="Interest Areas", target_node_label="keyword")
 
 # %%
 table1_path = 'data/qiagen_rneasy.csv'

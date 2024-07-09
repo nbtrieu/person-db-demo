@@ -26,6 +26,7 @@ from gremlin_python.process.traversal import (
 )
 from tqdm import tqdm
 from datetime import datetime, timezone
+from itertools import islice
 from database import BulkQueryExecutor
 from data_objects import Person, Organization, Keyword
 
@@ -116,14 +117,18 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
             ** ({Person.PropertyKey.SOCIAL_MEDIA: row["Social Media"]} if "Social Media" in contact_df.columns and not pd.isnull(row.get("Social Media")) else {}),
             ** ({Person.PropertyKey.DOB: row["DOB"]} if "DOB" in contact_df.columns and not pd.isnull(row.get("DOB")) else {}),
             ** ({Person.PropertyKey.TITLE: row["Title"]} if "Title" in contact_df.columns and not pd.isnull(row.get("Title")) else {}),
+            ** ({Person.PropertyKey.PREVIOUS_TITLES: row["Previous Titles"]} if "Previous Titles" in contact_df.columns and not pd.isnull(row.get("Previous Titles")) else {}),
             ** ({Person.PropertyKey.ORGANIZATION: row["Organization"]} if "Organization" in contact_df.columns and not pd.isnull(row.get("Organization")) else {}),
+            ** ({Person.PropertyKey.PREVIOUS_ORGANIZATIONS: row["Previous Organizations"]} if "Previous Organizations" in contact_df.columns and not pd.isnull(row.get("Previous Organizations")) else {}),
+            ** ({Person.PropertyKey.TENTATIVE_ORGANIZATIONS: row["Tentative Organizations"]} if "Tentative Organizations" in contact_df.columns and not pd.isnull(row.get("Tentative Organizations")) else {}),
             ** ({Person.PropertyKey.INTEREST_AREAS: row["Interest Areas"]} if "Interest Areas" in contact_df.columns and not pd.isnull(row.get("Interest Areas")) else {}),
             ** ({Person.PropertyKey.LEAD_SOURCE: row["Lead Source"]} if "Lead Source" in contact_df.columns and not pd.isnull(row.get("Lead Source")) else {}),
             ** ({Person.PropertyKey.EVENT_NAME: row["Event Name"]} if "Event Name" in contact_df.columns and not pd.isnull(row.get("Event Name")) else {}),
             ** ({Person.PropertyKey.MAILING_ADDRESS: row["Mailing Address"]} if "Mailing Address" in contact_df.columns and not pd.isnull(row.get("Mailing Address")) else {}),
             ** ({Person.PropertyKey.PURCHASING_AGENT: row["Purchasing Agent"]} if "Purchasing Agent" in contact_df.columns and not pd.isnull(row.get("Purchasing Agent")) else {}),
             ** ({Person.PropertyKey.VALIDATED_LEAD_STATUS: row["Validated Lead Status"]} if "Validated Lead Status" in contact_df.columns and not pd.isnull(row.get("Validated Lead Status")) else {}),
-            Person.PropertyKey.INGESTION_TAG: row.get("Ingestion Tag", None)
+            Person.PropertyKey.INGESTION_TAG: row.get("Ingestion Tag", None),
+            Person.PropertyKey.DATA_SOURCE: row.get("Data Source", None)
         }
 
         query_executor.add_vertex(
@@ -194,17 +199,17 @@ def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):
     query_executor.force_execute()
 
 
-def create_id_dict(g: GraphTraversalSource, vertex_label: str, property_key: str):
+def create_id_dict(g: GraphTraversalSource, vertex_label: str):
     node_list = (
         g.V()
         .has_label(vertex_label)
-        .project("id", property)
+        .project("id", "uuid")
         .by(__.id_())
-        .by(__.values(property))
-        .to_list()
+        .by(__.values("uuid"))
+        .toList()
     )
     id_dict = {
-        node[property_key]: node["id"] for node in node_list
+        node["uuid"]: node["id"] for node in node_list
     }
 
     return id_dict
@@ -216,8 +221,10 @@ def add_edges_person_organization(
 ):
     query_executor = BulkQueryExecutor(g, 100)
 
-    person_id_dict = create_id_dict(g, "person", "uuid")
-    organization_id_dict = create_id_dict(g, "organization", "uuid")
+    person_id_dict = create_id_dict(g, "person")
+    organization_id_dict = create_id_dict(g, "organization")
+
+    prepped_person_df['Organization'] = prepped_person_df['Organization'].str.strip().str.lower()
 
     for _, row in tqdm(
         prepped_person_df.iterrows(),
@@ -225,7 +232,7 @@ def add_edges_person_organization(
         desc="Adding person-organization edges"
     ):
         person_uuid_value = row.get("UUID")
-        organization_uuid_value = row["Organization"].str.strip().str.lower()
+        organization_uuid_value = row["Organization"]
 
         person_graph_id = person_id_dict.get(person_uuid_value)
         organization_graph_id = organization_id_dict.get(organization_uuid_value)
@@ -240,7 +247,6 @@ def add_edges_person_keyword(
     cleaned_interests_contact_df: pd.DataFrame,
 ):
     query_executor = BulkQueryExecutor(g, 100)
-
     person_id_dict = create_id_dict(g, "person")
     keyword_id_dict = create_id_dict(g, "keyword")
 
@@ -249,11 +255,11 @@ def add_edges_person_keyword(
         total=cleaned_interests_contact_df.shape[0],
         desc="Adding person-keyword edges"
     ):
-        person_uuid_value = row["Email"] if pd.notnull(row["Email"]) else "_".join([row["Full Name"], row["Organization"]]).replace(" ", "_").lower()
+        person_uuid_value = row.get("UUID")
         person_graph_id = person_id_dict.get(person_uuid_value)
 
         # This should be within the row loop to process each row's interests
-        interests = row["Area of Interests"]
+        interests = row["Interest Areas"]
         keywords = [keyword.strip() for keyword in interests.split(',')]
 
         for keyword in keywords:
