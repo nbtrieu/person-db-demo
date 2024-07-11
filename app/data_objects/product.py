@@ -1,0 +1,20 @@
+class Product:
+    ID_PREFIX = "PRODUCT:"
+    LABEL = "product"
+
+    class PropertyKey:
+        UUID = "uuid"
+        NAME = "name"
+        CATEGORY = "category"
+        PRODUCT_CLASS = "product_class"
+        ITEM_TYPE = "item_type"
+        DESCRIPTION = "description"
+        BASE_PRICE = "base_price"
+        SKU = "sku"
+        INACTIVE = "inactive"
+        SHELF_LIFE = "shelf_life"
+        STORAGE_TEMPERATURE = "storage_temperature"
+        SHIPPING_TEMPERATURE = "shipping_temperature"
+        DIMENSIONS = "dimensions"
+        WEIGHT = "weight"
+        AVAILABLE_STOCK = "available_stock"
