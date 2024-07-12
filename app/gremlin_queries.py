@@ -109,6 +109,7 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
     ):
         person_properties = {
             Person.PropertyKey.UUID: row.get("UUID"),
+            ** ({Person.PropertyKey.CUSTOMER_ID: row["Customer ID"]} if "Customer ID" in contact_df.columns and not pd.isnull(row.get("Customer ID")) else {}),
             ** ({Person.PropertyKey.FIRST_NAME: row["First Name"]} if "First Name" in contact_df.columns and not pd.isnull(row.get("First Name")) else {}),
             ** ({Person.PropertyKey.LAST_NAME: row["Last Name"]} if "Last Name" in contact_df.columns and not pd.isnull(row.get("Last Name")) else {}),
             ** ({Person.PropertyKey.FULL_NAME: row["Full Name"]} if "Full Name" in contact_df.columns and not pd.isnull(row.get("Full Name")) else {}),
@@ -271,6 +272,15 @@ def add_edges_person_keyword(
                 g.V(person_graph_id).addE("interested_in").to(__.V(keyword_graph_id)).iterate()
 
     query_executor.force_execute()
+
+
+def add_property(
+    g: GraphTraversalSource,
+    node_label: str,
+    property_key: str,
+    property_value: any
+):
+    g.V().hasLabel(node_label).property(property_key, property_value).iterate()
 
 
 # %% QUERYING DATA:

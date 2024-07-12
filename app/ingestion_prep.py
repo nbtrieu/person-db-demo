@@ -40,6 +40,10 @@ def harmonize_column_titles(df: pd.DataFrame) -> pd.DataFrame:
     """
     # Define the mapping of possible column names to standardized column names
     column_mapping = {
+        "Customer ID": "Customer ID",
+        "customerId": "Customer ID",
+        "customer_id": "Customer ID",
+        "CustomerID": "Customer ID",
         "First Name": "First Name",
         "first_name": "First Name",
         "fname": "First Name",
