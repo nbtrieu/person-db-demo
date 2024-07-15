@@ -5,6 +5,7 @@ class Publication:
     class PropertyKey:
         UUID = "uuid"  # same as identifier
         TITLE = "title"
+        AUTHOR = "author"
         ABSTRACT = "abstract"
         PUBLICATION_DATE = "publication_date"
         SOURCE_NAME = "source_name"
