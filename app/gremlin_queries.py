@@ -128,6 +128,7 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
             ** ({Person.PropertyKey.MAILING_ADDRESS: row["Mailing Address"]} if "Mailing Address" in contact_df.columns and not pd.isnull(row.get("Mailing Address")) else {}),
             ** ({Person.PropertyKey.PURCHASING_AGENT: row["Purchasing Agent"]} if "Purchasing Agent" in contact_df.columns and not pd.isnull(row.get("Purchasing Agent")) else {}),
             ** ({Person.PropertyKey.VALIDATED_LEAD_STATUS: row["Validated Lead Status"]} if "Validated Lead Status" in contact_df.columns and not pd.isnull(row.get("Validated Lead Status")) else {}),
+            ** ({Person.PropertyKey.STATUS: row["Status"]} if "Status" in contact_df.columns and not pd.isnull(row.get("Status")) else {}),
             Person.PropertyKey.INGESTION_TAG: row.get("Ingestion Tag", None),
             Person.PropertyKey.DATA_SOURCE: row.get("Data Source", None)
         }

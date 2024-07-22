@@ -78,17 +78,17 @@ async def app_startup():
     # )
 
     # TESTING:
-    # node_count = await asyncio.to_thread(
-    #     count_nodes_in_db, g, 'keyword'
-    # )
-    edge_count = await asyncio.to_thread(
-        count_edges_in_db, g, 'affiliated_with'
+    node_count = await asyncio.to_thread(
+        count_nodes_in_db, g, 'person'
     )
     # edge_count = await asyncio.to_thread(
-    #     count_edges_in_db, g, 'interested_in'
+    #     count_edges_in_db, g, 'affiliated_with'
     # )
+    edge_count = await asyncio.to_thread(
+        count_edges_in_db, g, 'interested_in'
+    )
     node_properties = await asyncio.to_thread(
-        check_node_properties, g, 'person', 'email', 'ngreenidge26@gmail.com'
+        check_node_properties, g, 'person', 'email', 'kniel@udel.edu'
     )
     # node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'organization', 'display_name', 'SML Genetree Co. Ltd'
@@ -97,7 +97,7 @@ async def app_startup():
     #     check_node_properties, g, 'keyword', 'name', 'NGS'
     # )
     # print('QUERY RESULT:', query_result)
-    # print('NODE COUNT:', node_count)
+    print('NODE COUNT:', node_count)
     print('EDGE COUNT:', edge_count)
     # print('NAME LIST:', name_list)
     print('NODE PROPERTIES:', node_properties)

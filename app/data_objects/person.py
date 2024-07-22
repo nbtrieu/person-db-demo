@@ -23,5 +23,6 @@ class Person:
         EVENT_NAME = "event_name"
         PURCHASING_AGENT = "purchasing_agent"
         VALIDATED_LEAD_STATUS = "validated_lead_status"
+        STATUS = "status"  # LEAD-0, CUSTOMER-5, etc
         INGESTION_TAG = "ingestion_tag"
         DATA_SOURCE = "data_source"
