@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
-from gremlin_queries import get_path, fix_property_value, add_people, add_keywords, add_organizations, add_keywords, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, drop_nodes, drop_edges, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, get_names, get_people_by_keyword
+from gremlin_queries import get_path, fix_property_value, add_people, add_keywords, add_organizations, add_products, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, drop_nodes, drop_edges, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, get_names, get_people_by_keyword
 import asyncio
 import database_connection
 import pandas as pd
@@ -34,7 +34,7 @@ async def app_startup():
     g = database_connection.get_gremlin_client()
     
     # NODE CREATION:
-    file_name = '2019-2023_Leads_List_Test_deduped.csv'
+    # file_name = '2019-2023_Leads_List_Test_deduped.csv'
     
     # person_df = pd.read_csv("data/prepped_" + file_name)
     # add_people(g, person_df)
@@ -44,6 +44,9 @@ async def app_startup():
 
     # unique_keywords_df = pd.read_csv('data/keyword_list_' + file_name)
     # add_keywords(g, unique_keywords_df)
+
+    # products_df = pd.read_csv('data/merged_netsuite_products.csv')
+    # add_products(g, products_df)
 
     # EDGE CREATION:
     # cleaned_keyword_person_df = pd.read_csv('data/cleaned_keyword_' + file_name)
@@ -71,7 +74,7 @@ async def app_startup():
 
     # DROP NODES/EDGES BY LABEL:
     # await asyncio.to_thread(
-    #     drop_nodes, g, 'organization'
+    #     drop_nodes, g, 'product'
     # )
     # await asyncio.to_thread(
     #     drop_edges, g, 'affiliated_with'
@@ -79,26 +82,29 @@ async def app_startup():
 
     # TESTING:
     node_count = await asyncio.to_thread(
-        count_nodes_in_db, g, 'person'
+        count_nodes_in_db, g, 'product'
     )
     # edge_count = await asyncio.to_thread(
     #     count_edges_in_db, g, 'affiliated_with'
     # )
-    edge_count = await asyncio.to_thread(
-        count_edges_in_db, g, 'interested_in'
-    )
-    node_properties = await asyncio.to_thread(
-        check_node_properties, g, 'person', 'email', 'kniel@udel.edu'
-    )
+    # edge_count = await asyncio.to_thread(
+    #     count_edges_in_db, g, 'interested_in'
+    # )
+    # node_properties = await asyncio.to_thread(
+    #     check_node_properties, g, 'person', 'email', 'kniel@udel.edu'
+    # )
     # node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'organization', 'display_name', 'SML Genetree Co. Ltd'
     # )
     # node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'keyword', 'name', 'NGS'
     # )
+    node_properties = await asyncio.to_thread(
+        check_node_properties, g, 'product', 'name', 'A4001-50'
+    )
     # print('QUERY RESULT:', query_result)
     print('NODE COUNT:', node_count)
-    print('EDGE COUNT:', edge_count)
+    # print('EDGE COUNT:', edge_count)
     # print('NAME LIST:', name_list)
     print('NODE PROPERTIES:', node_properties)
 
