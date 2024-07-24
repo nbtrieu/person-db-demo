@@ -1,6 +1,6 @@
-class Product:
-    ID_PREFIX = "PRODUCT:"
-    LABEL = "product"
+class ZymoProduct:
+    ID_PREFIX = "ZYMO_PRODUCT:"
+    LABEL = "zymo_product"
 
     class PropertyKey:
         UUID = "uuid"  # same as NAME

@@ -28,7 +28,7 @@ from tqdm import tqdm
 from datetime import datetime, timezone
 from itertools import islice
 from database import BulkQueryExecutor
-from data_objects import Person, Organization, Keyword, Product
+from data_objects import Person, Organization, Keyword, ZymoProduct
 
 import nest_asyncio
 nest_asyncio.apply()
@@ -200,41 +200,41 @@ def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):
 
     query_executor.force_execute()
 
-def add_products(g: GraphTraversalSource, products_df: pd.DataFrame):
+def add_products(g: GraphTraversalSource, zymo_products_df: pd.DataFrame):
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
-        products_df.iterrows(),
-        total=products_df.shape[0],
-        desc="Importing Products"
+        zymo_products_df.iterrows(),
+        total=zymo_products_df.shape[0],
+        desc="Importing Zymo Products"
     ):
         product_properties = {
-            Product.PropertyKey.UUID: row.get("Item name/SKU#"),
-            Product.PropertyKey.NAME: row.get("Item name/SKU#"),
-            Product.PropertyKey.CATEGORY: row.get("Product Category", None),
-            Product.PropertyKey.PRODUCT_CLASS: row.get("Class (no hierarchy)", None),
-            Product.PropertyKey.ITEM_TYPE: row.get("Type", None),
-            Product.PropertyKey.DESCRIPTION: row.get("Description", None),
-            Product.PropertyKey.SHORT_DESCRIPTION: row.get("Short Description", None),
-            Product.PropertyKey.BASE_PRICE: row.get("Base Price", None),
-            Product.PropertyKey.SKU: row.get("Item name/SKU#"),
-            Product.PropertyKey.INACTIVE: row.get("Inactive", None),
-            Product.PropertyKey.SHELF_LIFE: row.get("Shelf Life (Months)", None),
-            Product.PropertyKey.STORAGE_TEMPERATURE: row.get("Storage Temperature", None),
-            Product.PropertyKey.SHIPPING_TEMPERATURE: row.get("Shipping Temperature", None),
-            Product.PropertyKey.FEATURES: row.get("Features", None),
-            Product.PropertyKey.LENGTH: row.get("Length", None),
-            Product.PropertyKey.WIDTH: row.get("Width", None),
-            Product.PropertyKey.HEIGHT: row.get("Height", None),
-            Product.PropertyKey.WEIGHT: row.get("Weight", None),
-            Product.PropertyKey.AVAILABLE_STOCK: row.get("Available", None),
-            Product.PropertyKey.SAFETY_INFORMATION: row.get("Safety Data Sheet/ MSDS URL", None),
-            Product.PropertyKey.PRODUCT_URL: row.get("Product URL", None),
-            Product.PropertyKey.IMAGE_URL: row.get("Link for Main image of item", None)
+            ZymoProduct.PropertyKey.UUID: row.get("Item name/SKU#"),
+            ZymoProduct.PropertyKey.NAME: row.get("Item name/SKU#"),
+            ZymoProduct.PropertyKey.CATEGORY: row.get("Product Category", None),
+            ZymoProduct.PropertyKey.PRODUCT_CLASS: row.get("Class (no hierarchy)", None),
+            ZymoProduct.PropertyKey.ITEM_TYPE: row.get("Type", None),
+            ZymoProduct.PropertyKey.DESCRIPTION: row.get("Description", None),
+            ZymoProduct.PropertyKey.SHORT_DESCRIPTION: row.get("Short Description", None),
+            ZymoProduct.PropertyKey.BASE_PRICE: row.get("Base Price", None),
+            ZymoProduct.PropertyKey.SKU: row.get("Item name/SKU#"),
+            ZymoProduct.PropertyKey.INACTIVE: row.get("Inactive", None),
+            ZymoProduct.PropertyKey.SHELF_LIFE: row.get("Shelf Life (Months)", None),
+            ZymoProduct.PropertyKey.STORAGE_TEMPERATURE: row.get("Storage Temperature", None),
+            ZymoProduct.PropertyKey.SHIPPING_TEMPERATURE: row.get("Shipping Temperature", None),
+            ZymoProduct.PropertyKey.FEATURES: row.get("Features", None),
+            ZymoProduct.PropertyKey.LENGTH: row.get("Length", None),
+            ZymoProduct.PropertyKey.WIDTH: row.get("Width", None),
+            ZymoProduct.PropertyKey.HEIGHT: row.get("Height", None),
+            ZymoProduct.PropertyKey.WEIGHT: row.get("Weight", None),
+            ZymoProduct.PropertyKey.AVAILABLE_STOCK: row.get("Available", None),
+            ZymoProduct.PropertyKey.SAFETY_INFORMATION: row.get("Safety Data Sheet/ MSDS URL", None),
+            ZymoProduct.PropertyKey.PRODUCT_URL: row.get("Product URL", None),
+            ZymoProduct.PropertyKey.IMAGE_URL: row.get("Link for Main image of item", None)
         }
 
         query_executor.add_vertex(
-            label=Product.LABEL,
+            label=ZymoProduct.LABEL,
             properties=product_properties
         )
 

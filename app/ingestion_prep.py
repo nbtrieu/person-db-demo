@@ -292,14 +292,14 @@ leads1923_df.to_csv('data/updated_2019-2023_Leads_List_Test_deduped.csv', index=
 table1 = pd.read_csv('data/netsuite_products.csv')
 table2 = pd.read_csv('data/product_enrichment.csv')
 
+# Select specific columns from netsuite_products table
+table1 = table1[['Item name/SKU#', 'Product Category', 'Class (no hierarchy)', 'Type', 'Base Price', 'Inactive', 'Shelf Life (Months)', 'Storage Temperature', 'Shipping Temperature', 'Length', 'Width', 'Height', 'Weight', 'Available']]
+
 # Merge the "Highlight A", "Highlight B", and "Highlight C" columns into one "Features" column
 table2['Features'] = table2[['Highlight A', 'Highlight B', 'Highlight C']].apply(lambda x: ' '.join(x.dropna()), axis=1)
 
 # Select specific columns from product_enrichment table
 table2 = table2[['Catalog Number', 'Description', 'Short Description', 'Features', 'Safety Data Sheet/ MSDS URL', 'Product URL', 'Link for Main image of item']]
-
-# Select specific columns from netsuite_products table
-table1 = table1[['Item name/SKU#', 'Product Category', 'Class (no hierarchy)', 'Type', 'Base Price', 'Inactive', 'Shelf Life (Months)', 'Storage Temperature', 'Shipping Temperature', 'Length', 'Width', 'Height', 'Weight', 'Available']]
 
 # Merge the DataFrames on the matching columns
 merged_table = pd.merge(table1, table2, left_on='Item name/SKU#', right_on='Catalog Number', how='left')

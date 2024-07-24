@@ -45,8 +45,8 @@ async def app_startup():
     # unique_keywords_df = pd.read_csv('data/keyword_list_' + file_name)
     # add_keywords(g, unique_keywords_df)
 
-    # products_df = pd.read_csv('data/merged_netsuite_products.csv')
-    # add_products(g, products_df)
+    zymo_products_df = pd.read_csv('data/merged_netsuite_products.csv')
+    add_products(g, zymo_products_df)
 
     # EDGE CREATION:
     # cleaned_keyword_person_df = pd.read_csv('data/cleaned_keyword_' + file_name)
@@ -82,7 +82,7 @@ async def app_startup():
 
     # TESTING:
     node_count = await asyncio.to_thread(
-        count_nodes_in_db, g, 'product'
+        count_nodes_in_db, g, 'zymo_product'
     )
     # edge_count = await asyncio.to_thread(
     #     count_edges_in_db, g, 'affiliated_with'
@@ -100,7 +100,7 @@ async def app_startup():
     #     check_node_properties, g, 'keyword', 'name', 'NGS'
     # )
     node_properties = await asyncio.to_thread(
-        check_node_properties, g, 'product', 'name', 'A4001-50'
+        check_node_properties, g, 'zymo_product', 'name', 'A4001-50'
     )
     # print('QUERY RESULT:', query_result)
     print('NODE COUNT:', node_count)
