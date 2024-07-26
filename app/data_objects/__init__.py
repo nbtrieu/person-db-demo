@@ -5,3 +5,4 @@ from .publication import Publication
 from .project import Project
 from .event import Event
 from .zymo_product import ZymoProduct
+from .publication_product import PublicationProduct

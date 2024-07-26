@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
-from gremlin_queries import get_path, fix_property_value, add_people, add_keywords, add_organizations, add_products, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, drop_nodes, drop_edges, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, get_names, get_people_by_keyword
+from gremlin_queries import read_publications_from_file, get_path, fix_property_value, add_people, add_keywords, add_organizations, add_zymo_products, add_publications, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, drop_nodes, drop_edges, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, get_names, get_people_by_keyword
 import asyncio
 import database_connection
 import pandas as pd
@@ -45,8 +45,12 @@ async def app_startup():
     # unique_keywords_df = pd.read_csv('data/keyword_list_' + file_name)
     # add_keywords(g, unique_keywords_df)
 
-    zymo_products_df = pd.read_csv('data/merged_netsuite_products.csv')
-    add_products(g, zymo_products_df)
+    # zymo_products_df = pd.read_csv('data/merged_netsuite_products.csv')
+    # add_products(g, zymo_products_df)
+
+    # file_path = 'data/publication_metadata.json'
+    # publications = read_publications_from_file(file_path)
+    # add_publications(g, publications)
 
     # EDGE CREATION:
     # cleaned_keyword_person_df = pd.read_csv('data/cleaned_keyword_' + file_name)
@@ -74,7 +78,7 @@ async def app_startup():
 
     # DROP NODES/EDGES BY LABEL:
     # await asyncio.to_thread(
-    #     drop_nodes, g, 'product'
+    #     drop_nodes, g, 'publication'
     # )
     # await asyncio.to_thread(
     #     drop_edges, g, 'affiliated_with'
@@ -82,7 +86,7 @@ async def app_startup():
 
     # TESTING:
     node_count = await asyncio.to_thread(
-        count_nodes_in_db, g, 'zymo_product'
+        count_nodes_in_db, g, 'publication'
     )
     # edge_count = await asyncio.to_thread(
     #     count_edges_in_db, g, 'affiliated_with'
@@ -99,8 +103,11 @@ async def app_startup():
     # node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'keyword', 'name', 'NGS'
     # )
+    # node_properties = await asyncio.to_thread(
+    #     check_node_properties, g, 'zymo_product', 'name', 'A4001-50'
+    # )
     node_properties = await asyncio.to_thread(
-        check_node_properties, g, 'zymo_product', 'name', 'A4001-50'
+        check_node_properties, g, 'publication', 'url', 'https://www.nature.com/articles/s41467-022-34535-8'
     )
     # print('QUERY RESULT:', query_result)
     print('NODE COUNT:', node_count)

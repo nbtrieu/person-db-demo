@@ -5,6 +5,7 @@ import database
 import ssl
 import pickle
 import os
+import json
 from gremlin_python.driver.client import Client
 from gremlin_python.process.graph_traversal import GraphTraversalSource, __
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
@@ -28,7 +29,7 @@ from tqdm import tqdm
 from datetime import datetime, timezone
 from itertools import islice
 from database import BulkQueryExecutor
-from data_objects import Person, Organization, Keyword, ZymoProduct
+from data_objects import Person, Organization, Keyword, ZymoProduct, Publication
 
 import nest_asyncio
 nest_asyncio.apply()
@@ -200,7 +201,7 @@ def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):
 
     query_executor.force_execute()
 
-def add_products(g: GraphTraversalSource, zymo_products_df: pd.DataFrame):
+def add_zymo_products(g: GraphTraversalSource, zymo_products_df: pd.DataFrame):
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
@@ -211,26 +212,26 @@ def add_products(g: GraphTraversalSource, zymo_products_df: pd.DataFrame):
         product_properties = {
             ZymoProduct.PropertyKey.UUID: row.get("Item name/SKU#"),
             ZymoProduct.PropertyKey.NAME: row.get("Item name/SKU#"),
-            ZymoProduct.PropertyKey.CATEGORY: row.get("Product Category", None),
-            ZymoProduct.PropertyKey.PRODUCT_CLASS: row.get("Class (no hierarchy)", None),
-            ZymoProduct.PropertyKey.ITEM_TYPE: row.get("Type", None),
-            ZymoProduct.PropertyKey.DESCRIPTION: row.get("Description", None),
-            ZymoProduct.PropertyKey.SHORT_DESCRIPTION: row.get("Short Description", None),
-            ZymoProduct.PropertyKey.BASE_PRICE: row.get("Base Price", None),
+            ZymoProduct.PropertyKey.CATEGORY: row.get("Product Category"),
+            ZymoProduct.PropertyKey.PRODUCT_CLASS: row.get("Class (no hierarchy)"),
+            ZymoProduct.PropertyKey.ITEM_TYPE: row.get("Type"),
+            ZymoProduct.PropertyKey.DESCRIPTION: row.get("Description"),
+            ZymoProduct.PropertyKey.SHORT_DESCRIPTION: row.get("Short Description"),
+            ZymoProduct.PropertyKey.BASE_PRICE: row.get("Base Price"),
             ZymoProduct.PropertyKey.SKU: row.get("Item name/SKU#"),
-            ZymoProduct.PropertyKey.INACTIVE: row.get("Inactive", None),
-            ZymoProduct.PropertyKey.SHELF_LIFE: row.get("Shelf Life (Months)", None),
-            ZymoProduct.PropertyKey.STORAGE_TEMPERATURE: row.get("Storage Temperature", None),
-            ZymoProduct.PropertyKey.SHIPPING_TEMPERATURE: row.get("Shipping Temperature", None),
-            ZymoProduct.PropertyKey.FEATURES: row.get("Features", None),
-            ZymoProduct.PropertyKey.LENGTH: row.get("Length", None),
-            ZymoProduct.PropertyKey.WIDTH: row.get("Width", None),
-            ZymoProduct.PropertyKey.HEIGHT: row.get("Height", None),
-            ZymoProduct.PropertyKey.WEIGHT: row.get("Weight", None),
-            ZymoProduct.PropertyKey.AVAILABLE_STOCK: row.get("Available", None),
-            ZymoProduct.PropertyKey.SAFETY_INFORMATION: row.get("Safety Data Sheet/ MSDS URL", None),
-            ZymoProduct.PropertyKey.PRODUCT_URL: row.get("Product URL", None),
-            ZymoProduct.PropertyKey.IMAGE_URL: row.get("Link for Main image of item", None)
+            ZymoProduct.PropertyKey.INACTIVE: row.get("Inactive"),
+            ZymoProduct.PropertyKey.SHELF_LIFE: row.get("Shelf Life (Months)"),
+            ZymoProduct.PropertyKey.STORAGE_TEMPERATURE: row.get("Storage Temperature"),
+            ZymoProduct.PropertyKey.SHIPPING_TEMPERATURE: row.get("Shipping Temperature"),
+            ZymoProduct.PropertyKey.FEATURES: row.get("Features"),
+            ZymoProduct.PropertyKey.LENGTH: row.get("Length"),
+            ZymoProduct.PropertyKey.WIDTH: row.get("Width"),
+            ZymoProduct.PropertyKey.HEIGHT: row.get("Height"),
+            ZymoProduct.PropertyKey.WEIGHT: row.get("Weight"),
+            ZymoProduct.PropertyKey.AVAILABLE_STOCK: row.get("Available"),
+            ZymoProduct.PropertyKey.SAFETY_INFORMATION: row.get("Safety Data Sheet/ MSDS URL"),
+            ZymoProduct.PropertyKey.PRODUCT_URL: row.get("Product URL"),
+            ZymoProduct.PropertyKey.IMAGE_URL: row.get("Link for Main image of item")
         }
 
         query_executor.add_vertex(
@@ -239,6 +240,48 @@ def add_products(g: GraphTraversalSource, zymo_products_df: pd.DataFrame):
         )
 
     query_executor.force_execute()
+
+def add_publications(g: GraphTraversalSource, publications: list):
+    query_executor = BulkQueryExecutor(g, 100)
+
+    for publication in tqdm(
+        publications,
+        total=len(publications),
+        desc="Importing Publications"
+    ):
+        publication_properties = {
+            Publication.PropertyKey.UUID: publication['_id']['$oid'],
+            Publication.PropertyKey.TITLE: publication.get('title'),
+            Publication.PropertyKey.DOI: publication.get('doi'),
+            Publication.PropertyKey.PUBLICATION_DATE: publication.get('publication_date'),
+            Publication.PropertyKey.AFFILIATIONS: json.dumps(publication.get('affiliations')),  # Serialize to JSON string
+            Publication.PropertyKey.ABSTRACT: publication.get('abstract'),
+            Publication.PropertyKey.SOURCE_NAME: publication.get('source_name'),
+            Publication.PropertyKey.VOLUME: publication.get('volume'),
+            Publication.PropertyKey.ISSUE: publication.get('issue'),
+            Publication.PropertyKey.START_PAGE: publication.get('start_page'),
+            Publication.PropertyKey.END_PAGE: publication.get('end_page'),
+            Publication.PropertyKey.KEYWORDS: json.dumps(publication.get('keywords')),  # Serialize to JSON string if not None
+            Publication.PropertyKey.PUBLICATION_TYPE: publication.get('publication_type'),
+            Publication.PropertyKey.CITATIONS: publication.get('citations'),
+            Publication.PropertyKey.REFERENCES: json.dumps(publication.get('references')),  # Serialize to JSON string
+            Publication.PropertyKey.URL: publication.get('url'),
+            Publication.PropertyKey.NOTES: None  # Assuming no notes for now
+        }
+
+        query_executor.add_vertex(
+            label=Publication.LABEL,
+            properties=publication_properties
+        )
+
+    query_executor.force_execute()
+
+# def add_publication_products(g: GraphTraversalSource, )
+
+def read_publications_from_file(file_path):
+    with open(file_path, 'r') as file:
+        publications = json.load(file)
+    return publications
 
 def create_id_dict(g: GraphTraversalSource, vertex_label: str):
     node_list = (
