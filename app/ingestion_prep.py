@@ -2,6 +2,7 @@
 import pandas as pd
 import uuid
 import numpy as np
+import json
 
 # %%
 def remove_overlaps(table1_path: str, table2_path: str, new_table2_path: str):
@@ -263,31 +264,31 @@ prep_edges_df(file_name=file_name, column_name="Organization", target_node_label
 prep_edges_df(file_name=file_name, column_name="Keywords", target_node_label="keyword")
 
 # %%
-table1_path = 'data/qiagen_rneasy.csv'
-table2_path = 'data/2019-2023_Leads_List_Test_deduped.csv'
-new_table2_path = 'data/updated_2019-23_leads.csv'
+# table1_path = 'data/qiagen_rneasy.csv'
+# table2_path = 'data/2019-2023_Leads_List_Test_deduped.csv'
+# new_table2_path = 'data/updated_2019-23_leads.csv'
 
-remove_overlaps(table1_path, table2_path, new_table2_path)
+# remove_overlaps(table1_path, table2_path, new_table2_path)
 
-# %%
-qiagen_df = pd.read_csv('data/qiagen_rneasy.csv')
-print('QIAGEN:', qiagen_df)
+# # %%
+# qiagen_df = pd.read_csv('data/qiagen_rneasy.csv')
+# print('QIAGEN:', qiagen_df)
 
-# %%
-qiagen_df_deduped = qiagen_df.drop_duplicates()
-print('DEDUPED QIAGEN:', qiagen_df_deduped)
-qiagen_df_deduped.to_csv('data/deduped_qiagen_rneasy.csv', index=False)
+# # %%
+# qiagen_df_deduped = qiagen_df.drop_duplicates()
+# print('DEDUPED QIAGEN:', qiagen_df_deduped)
+# qiagen_df_deduped.to_csv('data/deduped_qiagen_rneasy.csv', index=False)
 
-# %%
-leads1923_df = pd.read_csv('data/2019-2023_Leads_List_Test_deduped.csv')
-leads1923_df['Ingestion Tag'] = "2019-23"
+# # %%
+# leads1923_df = pd.read_csv('data/2019-2023_Leads_List_Test_deduped.csv')
+# leads1923_df['Ingestion Tag'] = "2019-23"
 
-# %%
-print(leads1923_df)
-leads1923_df.to_csv('data/updated_2019-2023_Leads_List_Test_deduped.csv', index=False
-                    )
+# # %%
+# print(leads1923_df)
+# leads1923_df.to_csv('data/updated_2019-2023_Leads_List_Test_deduped.csv', index=False
+#                     )
 
-# %% PRODUCT INGESTION
+# %% ZYMO PRODUCT INGESTION
 # Load the CSV files into DataFrames
 table1 = pd.read_csv('data/netsuite_products.csv')
 table2 = pd.read_csv('data/product_enrichment.csv')
@@ -309,5 +310,31 @@ merged_table = merged_table.drop(columns=['Catalog Number'])
 
 # Save the merged table to a new CSV file
 merged_table.to_csv('data/merged_netsuite_products.csv', index=False)
+
+# %% PUBLICATION PRODUCT INGESTION
+def generate_uuid():
+    return str(uuid.uuid4())
+
+def add_uuids_to_products(publication_products):
+    for publication_product in publication_products:
+        for product in publication_product["products"]:
+            product["uuid"] = generate_uuid()
+
+def save_json_file(data, file_path):
+    with open(file_path, 'w') as file:
+        json.dump(data, file, indent=2)
+
+def load_json_file(file_path):
+    with open(file_path, 'r') as file:
+        return json.load(file)
+
+input_file_path = 'data/publication_product_data.json'
+output_file_path = 'data/uuid_publication_product_data.json'
+
+publication_products = load_json_file(input_file_path)
+
+# Add UUIDs to publication_products and save to new file
+add_uuids_to_products(publication_products)
+save_json_file(publication_products, output_file_path)
 
 # %%

@@ -3,7 +3,7 @@ class PublicationProduct:
     LABEL = "publication_product"
 
     class PropertyKey:
-        UUID = "uuid"
+        UUID = "uuid"  # script-generated
         URL = "url"
         DOI = "doi"
         NAME = "name"

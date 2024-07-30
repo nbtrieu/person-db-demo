@@ -29,7 +29,7 @@ from tqdm import tqdm
 from datetime import datetime, timezone
 from itertools import islice
 from database import BulkQueryExecutor
-from data_objects import Person, Organization, Keyword, ZymoProduct, Publication
+from data_objects import Person, Organization, Keyword, ZymoProduct, Publication, PublicationProduct
 
 import nest_asyncio
 nest_asyncio.apply()
@@ -241,6 +241,10 @@ def add_zymo_products(g: GraphTraversalSource, zymo_products_df: pd.DataFrame):
 
     query_executor.force_execute()
 
+def load_json_file(file_path):
+    with open(file_path, 'r') as file:
+        return json.load(file)
+
 def add_publications(g: GraphTraversalSource, publications: list):
     query_executor = BulkQueryExecutor(g, 100)
 
@@ -276,28 +280,66 @@ def add_publications(g: GraphTraversalSource, publications: list):
 
     query_executor.force_execute()
 
-# def add_publication_products(g: GraphTraversalSource, )
+def add_publication_products(g: GraphTraversalSource, publication_products: list):
+    query_executor = BulkQueryExecutor(g, 100)
 
-def read_publications_from_file(file_path):
-    with open(file_path, 'r') as file:
-        publications = json.load(file)
-    return publications
+    for publication_product in tqdm(
+        publication_products,
+        total=len(publication_products),
+        desc="Importing Publication Products"
+    ):
+        for product in publication_product["products"]:
+            publication_product_properties = {
+                PublicationProduct.PropertyKey.UUID: product["uuid"],
+                PublicationProduct.PropertyKey.URL: publication_product.get("url"),
+                PublicationProduct.PropertyKey.DOI: publication_product.get("doi"),
+                PublicationProduct.PropertyKey.NAME: product.get("product"),
+                PublicationProduct. PropertyKey.COMPANY: product.get("company")
+            }
 
-def create_id_dict(g: GraphTraversalSource, vertex_label: str):
+            query_executor.add_vertex(
+                label=PublicationProduct.LABEL,
+                properties=publication_product_properties
+            )
+    
+    query_executor.force_execute()
+
+def create_id_dict(g: GraphTraversalSource, vertex_label: str, primary_property_label: str):
     node_list = (
         g.V()
         .has_label(vertex_label)
-        .project("id", "uuid")
+        .project("id", primary_property_label)
         .by(__.id_())
-        .by(__.values("uuid"))
+        .by(__.values(primary_property_label))
         .toList()
     )
     id_dict = {
-        node["uuid"]: node["id"] for node in node_list
+        node[primary_property_label]: node["id"] for node in node_list
     }
 
     return id_dict
 
+def add_edges_publication_product(g: GraphTraversalSource, publication_products: list):
+    query_executor = BulkQueryExecutor(g, 100)
+
+    publication_id_dict = create_id_dict(g, "publication", "doi")
+    publication_product_id_dict = create_id_dict(g, "publication_product", "uuid")
+
+    for publication_product in tqdm(
+        publication_products,
+        total=len(publication_products),
+        desc="Adding Publication-Products Edges"
+    ):
+        for product in publication_product["products"]:
+            publication_doi_value = publication_product.get("doi")
+            publication_product_uuid_value = product.get("uuid")
+
+            publication_graph_id = publication_id_dict.get(publication_doi_value)
+            publication_product_graph_id = publication_product_id_dict.get(publication_product_uuid_value)
+
+            g.V(publication_graph_id).addE("mentions").to(__.V(publication_product_graph_id)).iterate()
+    
+    query_executor.force_execute()
 
 def add_edges_person_organization(
     g: GraphTraversalSource,
@@ -305,8 +347,8 @@ def add_edges_person_organization(
 ):
     query_executor = BulkQueryExecutor(g, 100)
 
-    person_id_dict = create_id_dict(g, "person")
-    organization_id_dict = create_id_dict(g, "organization")
+    person_id_dict = create_id_dict(g, "person", "uuid")
+    organization_id_dict = create_id_dict(g, "organization", "uuid")
 
     prepped_person_df['Organization'] = prepped_person_df['Organization'].str.strip().str.lower()
 
@@ -331,8 +373,8 @@ def add_edges_person_keyword(
     cleaned_interests_contact_df: pd.DataFrame,
 ):
     query_executor = BulkQueryExecutor(g, 100)
-    person_id_dict = create_id_dict(g, "person")
-    keyword_id_dict = create_id_dict(g, "keyword")
+    person_id_dict = create_id_dict(g, "person", "uuid")
+    keyword_id_dict = create_id_dict(g, "keyword", "uuid")
 
     for _, row in tqdm(
         cleaned_interests_contact_df.iterrows(),
