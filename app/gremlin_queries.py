@@ -455,8 +455,17 @@ def get_people_from_organization(g: GraphTraversalSource, organization_name: str
 
 
 # %%
-# test_people = get_people_from_organization(g, "Truepill")
-# print(test_people)
+def get_publications_by_product(g: GraphTraversalSource, product_name: str):
+    return (
+        g.V()
+        .has("publication_product", "name", product_name)
+        .bothE()
+        .outV()
+        .hasLabel("publication")
+        .valueMap()
+        .dedup()
+        .toList()
+    )
 
 
 # %% Search by name for possibly multiple people to get all property values:
