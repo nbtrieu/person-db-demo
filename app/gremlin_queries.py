@@ -468,6 +468,32 @@ def get_publications_by_product(g: GraphTraversalSource, product_name: str):
     )
 
 
+# %%
+def get_people_by_publication_product(g: GraphTraversalSource, product_name: str):
+    publications = (
+        g.V()
+        .has("publication_product", "name", product_name)
+        .inE("mentions")
+        .outV()
+        .hasLabel("publication")
+        .valueMap()
+        .dedup()
+        .toList()
+    )
+
+    affiliations = []
+
+    for publication in publications:
+        if 'affiliations' in publication:
+            # Deserialize the JSON string if 'affiliations' is stored as a string
+            if isinstance(publication['affiliations'], list) and len(publication['affiliations']) > 0:
+                affiliations_json_str = publication['affiliations'][0]
+                deserialized_affiliations = json.loads(affiliations_json_str)
+                affiliations.extend(deserialized_affiliations)
+
+    return affiliations
+
+
 # %% Search by name for possibly multiple people to get all property values:
 def get_people_by_full_name(g: GraphTraversalSource, name_value: str):
     return (
