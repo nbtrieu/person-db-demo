@@ -52,9 +52,9 @@ async def app_startup():
     # publications = load_json_file(file_path)
     # add_publications(g, publications)
 
-    # file_path = 'data/uuid_publication_product_data.json'
-    # publication_products = load_json_file(file_path)
-    # add_publication_products(g, publication_products)
+    file_path = 'data/lowercase_product_data.json'
+    publication_products = load_json_file(file_path)
+    add_publication_products(g, publication_products)
 
     # EDGE CREATION:
     # cleaned_keyword_person_df = pd.read_csv('data/cleaned_keyword_' + file_name)
@@ -77,9 +77,9 @@ async def app_startup():
     # function_result = await asyncio.to_thread(
     #     fix_property_value, g, 'person', 'ngreenidge26@gmail.com', 'title', 'Sr. Manager Quality Assurance and Regulatory Affair'
     # )
-    function_result = await asyncio.to_thread(
-        add_standardized_name, g
-    )
+    # function_result = await asyncio.to_thread(
+    #     add_standardized_name, g
+    # )
     # query_result = await asyncio.to_thread(
     #     get_names, g, "publication_product"
     # )
@@ -92,16 +92,16 @@ async def app_startup():
 
     # DROP NODES/EDGES BY LABEL:
     # await asyncio.to_thread(
-    #     drop_nodes, g, 'publication'
+    #     drop_nodes, g, 'publication_product'
     # )
     # await asyncio.to_thread(
     #     drop_edges, g, 'affiliated_with'
     # )
 
     # TESTING:
-    # node_count = await asyncio.to_thread(
-    #     count_nodes_in_db, g, 'publication'
-    # )
+    node_count = await asyncio.to_thread(
+        count_nodes_in_db, g, 'publication_product'
+    )
     # edge_count = await asyncio.to_thread(
     #     count_edges_in_db, g, 'affiliated_with'
     # )
@@ -127,7 +127,7 @@ async def app_startup():
     #     check_node_properties, g, 'publication', 'url', 'https://www.nature.com/articles/s41467-022-34535-8'
     # )
     publication_product_node_properties = await asyncio.to_thread(
-        check_node_properties, g, 'publication_product', 'standardized_name', 'qiagen rneasy mini kit'
+        check_node_properties, g, 'publication_product', 'name', 'qiagen rneasy mini kit'
     )
     # print('QUERY RESULT:', query_result)
     # print('NODE COUNT:', node_count)

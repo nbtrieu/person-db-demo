@@ -324,14 +324,14 @@ def add_edges_publication_product(g: GraphTraversalSource, publication_products:
     publication_id_dict = create_id_dict(g, "publication", "doi")
     publication_product_id_dict = create_id_dict(g, "publication_product", "uuid")
 
-    for publication_product in tqdm(
+    for product in tqdm(
         publication_products,
         total=len(publication_products),
         desc="Adding Publication-Products Edges"
     ):
-        for product in publication_product["products"]:
-            publication_doi_value = publication_product.get("doi")
-            publication_product_uuid_value = product.get("uuid")
+        for doi in product["publications"]:
+            publication_doi_value = doi
+            publication_product_uuid_value = product['_id']['$oid']
 
             publication_graph_id = publication_id_dict.get(publication_doi_value)
             publication_product_graph_id = publication_product_id_dict.get(publication_product_uuid_value)
