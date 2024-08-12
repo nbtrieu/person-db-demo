@@ -291,7 +291,9 @@ def add_publication_products(g: GraphTraversalSource, publication_products: list
         publication_product_properties = {
             PublicationProduct.PropertyKey.UUID: product['_id']['$oid'],
             PublicationProduct.PropertyKey.NAME: product.get("product"),
-            PublicationProduct.PropertyKey.DOI: product.get("dois"),
+            PublicationProduct.PropertyKey.COMPANY: product.get("company"),
+            PublicationProduct.PropertyKey.DISPLAY_NAME: product.get("display_name"),
+            PublicationProduct.PropertyKey.PUBLICATIONS: product.get("publications"),
         }
 
         query_executor.add_vertex(

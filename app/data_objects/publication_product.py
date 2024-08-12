@@ -5,4 +5,6 @@ class PublicationProduct:
     class PropertyKey:
         UUID = "uuid"  # objectId from mongoDB
         NAME = "name"
-        DOI = "doi" # list type
+        COMPANY = "company"
+        DISPLAY_NAME = "display_name"
+        PUBLICATIONS = "publications" # list type
