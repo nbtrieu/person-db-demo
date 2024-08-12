@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
-from gremlin_queries import load_json_file, add_people, add_keywords, add_organizations, add_zymo_products, add_publications, add_publication_products, add_edges_publication_product, get_publications_by_product, get_people_by_publication_product, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, drop_nodes, drop_edges, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, get_names, get_people_by_keyword
+from gremlin_queries import load_json_file, add_people, add_keywords, add_organizations, add_zymo_products, add_publications, add_publication_products, add_edges_publication_product, add_standardized_name, get_publications_by_product, get_people_by_publication_product, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, drop_nodes, drop_edges, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, get_names, get_people_by_keyword
 import asyncio
 import database_connection
 import pandas as pd
@@ -77,9 +77,15 @@ async def app_startup():
     # function_result = await asyncio.to_thread(
     #     fix_property_value, g, 'person', 'ngreenidge26@gmail.com', 'title', 'Sr. Manager Quality Assurance and Regulatory Affair'
     # )
-    query_result = await asyncio.to_thread(
-        get_people_by_publication_product, g, "Qiagen RNeasy Mini Kit"
+    function_result = await asyncio.to_thread(
+        add_standardized_name, g
     )
+    # query_result = await asyncio.to_thread(
+    #     get_names, g, "publication_product"
+    # )
+    # query_result = await asyncio.to_thread(
+    #     get_people_by_publication_product, g, "Qiagen RNeasy Mini Kit"
+    # )
     # name_list = await asyncio.to_thread(
     #     get_names, g, 'organization'
     # )
@@ -120,15 +126,15 @@ async def app_startup():
     # publication_node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'publication', 'url', 'https://www.nature.com/articles/s41467-022-34535-8'
     # )
-    # publication_product_node_properties = await asyncio.to_thread(
-    #     check_node_properties, g, 'publication_product', 'uuid', '6046b722-ef7b-4d70-a575-9145e260d6ef'
-    # )
-    print('QUERY RESULT:', query_result)
+    publication_product_node_properties = await asyncio.to_thread(
+        check_node_properties, g, 'publication_product', 'standardized_name', 'qiagen rneasy mini kit'
+    )
+    # print('QUERY RESULT:', query_result)
     # print('NODE COUNT:', node_count)
     # print('EDGE COUNT:', edge_count)
     # print('NAME LIST:', name_list)
     # print('NODE PROPERTIES:', publication_node_properties)
-    # print('NODE PROPERTIES:', publication_product_node_properties)
+    print('NODE PROPERTIES:', publication_product_node_properties)
 
 @app.on_event("shutdown")
 async def shutdown():

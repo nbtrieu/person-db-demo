@@ -3,8 +3,6 @@ class PublicationProduct:
     LABEL = "publication_product"
 
     class PropertyKey:
-        UUID = "uuid"  # script-generated
-        URL = "url"
-        DOI = "doi"
+        UUID = "uuid"  # objectId from mongoDB
         NAME = "name"
-        COMPANY = "company"
+        DOI = "doi" # list type

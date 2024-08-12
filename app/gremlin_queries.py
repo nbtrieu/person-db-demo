@@ -283,24 +283,21 @@ def add_publications(g: GraphTraversalSource, publications: list):
 def add_publication_products(g: GraphTraversalSource, publication_products: list):
     query_executor = BulkQueryExecutor(g, 100)
 
-    for publication_product in tqdm(
+    for product in tqdm(
         publication_products,
         total=len(publication_products),
         desc="Importing Publication Products"
     ):
-        for product in publication_product["products"]:
-            publication_product_properties = {
-                PublicationProduct.PropertyKey.UUID: product["uuid"],
-                PublicationProduct.PropertyKey.URL: publication_product.get("url"),
-                PublicationProduct.PropertyKey.DOI: publication_product.get("doi"),
-                PublicationProduct.PropertyKey.NAME: product.get("product"),
-                PublicationProduct. PropertyKey.COMPANY: product.get("company")
-            }
+        publication_product_properties = {
+            PublicationProduct.PropertyKey.UUID: product['_id']['$oid'],
+            PublicationProduct.PropertyKey.NAME: product.get("product"),
+            PublicationProduct.PropertyKey.DOI: product.get("dois"),
+        }
 
-            query_executor.add_vertex(
-                label=PublicationProduct.LABEL,
-                properties=publication_product_properties
-            )
+        query_executor.add_vertex(
+            label=PublicationProduct.LABEL,
+            properties=publication_product_properties
+        )
     
     query_executor.force_execute()
 
@@ -399,13 +396,23 @@ def add_edges_person_keyword(
     query_executor.force_execute()
 
 
-def add_property(
+def add_property_same_value(
     g: GraphTraversalSource,
     node_label: str,
     property_key: str,
     property_value: any
 ):
     g.V().hasLabel(node_label).property(property_key, property_value).iterate()
+
+def add_standardized_name(g: GraphTraversalSource):
+    names_and_ids = g.V().hasLabel("publication_product") \
+                   .project("id", "name") \
+                   .by(__.id()) \
+                   .by(__.values("name")) \
+                   .toList()
+    
+    for entry in names_and_ids:
+        g.V(entry["id"]).property("standardized_name", entry["name"].lower()).iterate()
 
 
 # %% QUERYING DATA:
