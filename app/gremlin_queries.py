@@ -64,9 +64,19 @@ def count_nodes_in_db(g: GraphTraversalSource, label: str):
     return node_count
 
 
+def count_specific_nodes_in_db(g: GraphTraversalSource, label: str, property_key: str, property_value: str):
+    specific_node_count = g.V().has(label, property_key, property_value).count().next()
+    return specific_node_count
+
+
 def count_edges_in_db(g: GraphTraversalSource, label: str):
     edge_count = g.E().hasLabel(label).count().next()
     return edge_count
+
+
+def count_specific_edges_in_db(g: GraphTraversalSource, label: str, property_key: str, property_value: str):
+    specific_edge_count = g.E().has(label, property_key, property_value).count().next()
+    return specific_edge_count
 
 
 def drop_nodes(g: GraphTraversalSource, label: str):
@@ -82,8 +92,20 @@ def drop_edges(g: GraphTraversalSource, label: str):
     return
 
 
+def drop_specific_node(g: GraphTraversalSource, label: str, property_key: str, property_value: str):
+    g.V().has(label, property_key, property_value).drop().iterate()
+    print(f"{label} node with {property_key} of {property_value} dropped")
+    return
+
+
+def drop_specific_edge(g: GraphTraversalSource, label: str, property_key: str, property_value: str):
+    g.E().has(label, property_key, property_value).drop().iterate()
+    print(f"{label} edge with {property_key} of {property_value} dropped")
+    return
+
+
 def get_names(g: GraphTraversalSource, label: str):
-    name_list = g.V().hasLabel(label).values('name').toList()
+    name_list = g.V().hasLabel(label).values('display_name').dedup().toList()
     return name_list
 
 
@@ -131,7 +153,21 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
             ** ({Person.PropertyKey.VALIDATED_LEAD_STATUS: row["Validated Lead Status"]} if "Validated Lead Status" in contact_df.columns and not pd.isnull(row.get("Validated Lead Status")) else {}),
             ** ({Person.PropertyKey.STATUS: row["Status"]} if "Status" in contact_df.columns and not pd.isnull(row.get("Status")) else {}),
             Person.PropertyKey.INGESTION_TAG: row.get("Ingestion Tag", None),
-            Person.PropertyKey.DATA_SOURCE: row.get("Data Source", None)
+            Person.PropertyKey.DATA_SOURCE: row.get("Data Source", None),
+            ** ({Person.PropertyKey.NUMBER_OF_CASES: row["Number of Cases"]} if "Number of Cases" in contact_df.columns and not pd.isnull(row.get("Number of Cases")) else {}),
+            ** ({Person.PropertyKey.SCORE_CASE: row["Score Case"]} if "Score Case" in contact_df.columns and not pd.isnull(row.get("Score Case")) else {}),
+            ** ({Person.PropertyKey.QUANTITY: row["Quantity"]} if "Quantity" in contact_df.columns and not pd.isnull(row.get("Quantity")) else {}),
+            ** ({Person.PropertyKey.SALES: row["Sales"]} if "Sales" in contact_df.columns and not pd.isnull(row.get("Sales")) else {}),
+            ** ({Person.PropertyKey.NUMBER_OF_ORDERS: row["Number of Orders"]} if "Number of Orders" in contact_df.columns and not pd.isnull(row.get("Number of Orders")) else {}),
+            ** ({Person.PropertyKey.SCORE_SALES: row["Score Sales"]} if "Score Sales" in contact_df.columns and not pd.isnull(row.get("Score Sales")) else {}),
+            ** ({Person.PropertyKey.SCORE_TOTAL: row["Score Total"]} if "Score Total" in contact_df.columns and not pd.isnull(row.get("Score Total")) else {}),
+            ** ({Person.PropertyKey.RANK: row["Rank"]} if "Rank" in contact_df.columns and not pd.isnull(row.get("Rank")) else {}),
+            ** ({Person.PropertyKey.CASES_TIER: row["Cases Tier"]} if "Cases Tier" in contact_df.columns and not pd.isnull(row.get("Cases Tier")) else {}),
+            ** ({Person.PropertyKey.SALES_TIER: row["Sales Tier"]} if "Sales Tier" in contact_df.columns and not pd.isnull(row.get("Sales Tier")) else {}),
+            ** ({Person.PropertyKey.MESSAGE_TIER: row["Message Tier"]} if "Message Tier" in contact_df.columns and not pd.isnull(row.get("Message Tier")) else {}),
+            ** ({Person.PropertyKey.ORDERS_TIER: row["Orders Tier"]} if "Orders Tier" in contact_df.columns and not pd.isnull(row.get("Orders Tier")) else {}),
+            ** ({Person.PropertyKey.FULL_NAME: row["Full Name"]} if "Full Name" in contact_df.columns and not pd.isnull(row.get("Full Name")) else {}),
+            ** ({Person.PropertyKey.TITLE: row["Title"]} if "Title" in contact_df.columns and not pd.isnull(row.get("Title")) else {})
         }
 
         query_executor.add_vertex(
@@ -371,7 +407,6 @@ def add_edges_person_keyword(
     g: GraphTraversalSource,
     cleaned_interests_contact_df: pd.DataFrame,
 ):
-    query_executor = BulkQueryExecutor(g, 100)
     person_id_dict = create_id_dict(g, "person", "uuid")
     keyword_id_dict = create_id_dict(g, "keyword", "uuid")
 
@@ -387,15 +422,47 @@ def add_edges_person_keyword(
         interests = row["Keywords"]
         keywords = [keyword.strip() for keyword in interests.split(',')]
 
+        # Check if the current row has "lead_scoring" in the "Ingestion Tag" column
+        has_lead_scores = row.get("Ingestion Tag") == "lead_scoring"
+
         for keyword in keywords:
             keyword_uuid_value = keyword
             keyword_graph_id = keyword_id_dict.get(keyword_uuid_value)
 
-            # You should check if the graph IDs exist before trying to create edges
+            # Ensure both person and keyword IDs exist before creating an edge
             if person_graph_id is not None and keyword_graph_id is not None:
-                g.V(person_graph_id).addE("interested_in").to(__.V(keyword_graph_id)).iterate()
+                # Add edge with or without the "has_lead_scores" property based on the Ingestion Tag value
+                edge = g.V(person_graph_id).addE("interested_in").to(__.V(keyword_graph_id))
+                
+                if has_lead_scores:
+                    edge.property("has_lead_scores", "yes")
+                
+                edge.iterate()
 
-    query_executor.force_execute()
+
+def add_edges_publication_keyword(
+    g: GraphTraversalSource,
+    publications: list
+):
+    # query_executor = BulkQueryExecutor(g, 100)
+    
+    publication_id_dict = create_id_dict(g, "publication", "doi")
+    keyword_id_dict = create_id_dict(g, "keyword", "uuid")
+
+    for publication in tqdm(
+        publications,
+        total=len(publications),
+        desc="Adding Publication-Keyword Edges"
+    ):
+        publication_doi_value = publication["doi"]
+        keyword_uuid_value = publication["search_term"]
+
+        publication_graph_id = publication_id_dict.get(publication_doi_value)
+        keyword_graph_id = keyword_id_dict.get(keyword_uuid_value)
+
+        g.V(publication_graph_id).addE("relates_to").to(__.V(keyword_graph_id)).iterate()
+    
+    # query_executor.force_execute()
 
 
 def add_property_same_value(
@@ -416,8 +483,29 @@ def add_standardized_name(g: GraphTraversalSource):
     for entry in names_and_ids:
         g.V(entry["id"]).property("standardized_name", entry["name"].lower()).iterate()
 
+def add_individual_keyword(g: GraphTraversalSource, keyword: str):
+    query_executor = BulkQueryExecutor(g, 100)
+
+    current_time = datetime.now(timezone.utc).isoformat()
+
+    keyword_properties = {
+        Keyword.PropertyKey.UUID: keyword,
+        Keyword.PropertyKey.NAME: keyword,
+        Keyword.PropertyKey.CREATED_AT: current_time,
+        Keyword.PropertyKey.LAST_UPDATED_AT: current_time
+    }
+
+    query_executor.add_vertex(
+        label=Keyword.LABEL,
+        properties=keyword_properties
+    )
+
+    query_executor.force_execute()
+
 
 # %% QUERYING DATA:
+
+#  SEARCH BY KEYWORD:
 def get_people_by_keyword(g: GraphTraversalSource, keyword: str):
     return (
         g.V()
@@ -430,6 +518,45 @@ def get_people_by_keyword(g: GraphTraversalSource, keyword: str):
         .toList()
     )
 
+def get_organizations_by_keyword(g: GraphTraversalSource, keyword: str):
+    return (
+        g.V()
+        .has("keyword", "name", keyword)
+        .in_("interested_in")
+        .hasLabel("person")
+        .in_("affiliated_with")
+        .hasLabel("organization")
+        .valueMap()
+        .dedup()
+        .toList()
+    )
+
+
+def get_publications_by_keyword(g: GraphTraversalSource, keyword: str):
+    return (
+        g.V()
+        .has("keyword", "name", keyword)
+        .bothE()
+        .outV()
+        .hasLabel("publication")
+        .valueMap()
+        .dedup()
+        .toList()
+    )
+
+
+def get_publication_products_by_keyword(g: GraphTraversalSource, keyword: str):
+    return (
+        g.V()
+        .has("keyword", "name", keyword)
+        .in_("relates_to")
+        .hasLabel("publication")
+        .out("mentions")
+        .hasLabel("publication_product")
+        .valueMap()
+        .dedup()
+        .toList()
+    )
 
 def get_organization_by_person_name(g: GraphTraversalSource, person_name: str):
     return (

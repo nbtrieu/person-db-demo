@@ -71,6 +71,8 @@ def harmonize_column_titles(df: pd.DataFrame) -> pd.DataFrame:
         "Organisation": "Organization",
         "organization": "Organization",
         "organisation": "Organization",
+        "Company": "Organization",
+        "company": "Organization",
         "Previous Organizations": "Previous Organizations",
         "previous organizations": "Previous Organizations",
         "previous_organizations": "Previous Organizations",
@@ -118,7 +120,7 @@ def harmonize_column_titles(df: pd.DataFrame) -> pd.DataFrame:
         "Ingestion Tag": "Ingestion Tag",
         "ingestion_tag": "Ingestion Tag",
         "Keyword": "Keyword",
-        "keyword": "keyword",
+        "keyword": "Keyword",
         "Name": "Name",
         "name": "Name",
         "Type": "Type",
@@ -132,7 +134,21 @@ def harmonize_column_titles(df: pd.DataFrame) -> pd.DataFrame:
         "Created At": "Created At",
         "created_at": "Created At",
         "Last Updated At": "Last Updated At",
-        "last_updated_at": "Last Updated At"
+        "last_updated_at": "Last Updated At",
+        "#Cases": "Number of Cases",
+        "Score_Case": "Score Case",
+        "Qty.": "Quantity",
+        "Sales($)": "Sales",
+        "#Orders": "Number of Orders",
+        "Score_Sales": "Score Sales",
+        "Score_Total": "Score Total",
+        "Rank": "Rank",
+        "Cases Tier": "Cases Tier",
+        "Sales Tier": "Sales Tier",
+        "Message Tier": "Message Tier",
+        "Orders Tier": "Orders Tier",
+        "Department/Contact": "Full Name",
+        "Job Title": "Title"
     }
 
     # Rename the columns in the DataFrame
@@ -245,11 +261,17 @@ def prep_edges_df(file_name: str, column_name: str, target_node_label: str):
     cleaned_df.to_csv('data/cleaned_' + target_node_label + '_' + file_name, index=False)
 
 
-# %%
-file_name = '2019-2023_Leads_List_Test_deduped.csv'
+def prep_edges_same_keyword_df(file_name: str, keyword: str, target_node_label: str):
+    prepped_person_df = pd.read_csv('data/prepped_' + file_name)
+    prepped_person_df = harmonize_column_titles(prepped_person_df)
+    prepped_person_df["Keyword"] = keyword
+    prepped_person_df.to_csv('data/keyword_added_' + target_node_label + '_' + file_name, index=False)
 
 # %%
-prep_person_df(file_name=file_name, tag="2019-23", source="tradeshows")
+file_name = 'lead_scoring_data_2021-24.csv'
+
+# %%
+prep_person_df(file_name=file_name, tag="lead_scoring", source="Lead Scoring Data 2021-24")
 
 # %%
 prep_organization_df(file_name=file_name)
@@ -262,6 +284,9 @@ prep_edges_df(file_name=file_name, column_name="Organization", target_node_label
 
 # %%
 prep_edges_df(file_name=file_name, column_name="Keywords", target_node_label="keyword")
+
+# %%
+prep_edges_same_keyword_df(file_name=file_name, keyword="Lead Scores", target_node_label="keyword")
 
 # %%
 # table1_path = 'data/qiagen_rneasy.csv'
@@ -328,6 +353,7 @@ def load_json_file(file_path):
     with open(file_path, 'r') as file:
         return json.load(file)
 
+# %%
 input_file_path = 'data/publication_product_data.json'
 output_file_path = 'data/uuid_publication_product_data.json'
 
@@ -336,5 +362,14 @@ publication_products = load_json_file(input_file_path)
 # Add UUIDs to publication_products and save to new file
 add_uuids_to_products(publication_products)
 save_json_file(publication_products, output_file_path)
+
+# %%
+article_metadata = load_json_file('data/article_metadata.json')
+article_keywords = []
+for article in article_metadata:
+    keywords = article["search_term"]
+    if keywords not in article_keywords:
+        article_keywords.append(keywords)
+print(article_keywords)
 
 # %%
