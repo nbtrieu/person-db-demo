@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
-from gremlin_queries import load_json_file, add_edges_publication_keyword, add_individual_keyword, add_people, add_keywords, add_organizations, add_zymo_products, add_publications, add_publication_products, add_edges_publication_product, add_standardized_name, get_publication_products_by_keyword, get_publications_by_keyword, get_organizations_by_keyword, get_publications_by_product, get_people_by_publication_product, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, count_people_by_keyword, drop_nodes, drop_edges, drop_specific_node, drop_specific_edge, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, count_specific_nodes_in_db, count_specific_edges_in_db, get_names, get_people_by_keyword
+from gremlin_queries import load_json_file, add_edges_publication_keyword, add_individual_keyword, add_marketing_campaigns, add_people, add_keywords, add_organizations, add_zymo_products, add_publications, add_publication_products, add_edges_publication_product, add_standardized_name, get_publication_products_by_keyword, get_publications_by_keyword, get_organizations_by_keyword, get_publications_by_product, get_people_by_publication_product, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, count_people_by_keyword, drop_nodes, drop_edges, drop_specific_node, drop_specific_edge, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, count_specific_nodes_in_db, count_specific_edges_in_db, get_names, get_people_by_keyword
 import asyncio
 import database_connection
 import pandas as pd
@@ -34,8 +34,12 @@ async def app_startup():
     g = database_connection.get_gremlin_client()
     
     # NODE CREATION:
-    file_path = 'data/lead_scoring/'
-    file_name = 'lead_scoring_data_2021-24.csv'
+    # file_path = 'data/lead_scoring/'
+    # file_name = 'lead_scoring_data_2021-24.csv'
+    file_name = 'data/klaviyo/tagged_aug6_sep5_emails.csv'
+
+    marketing_campaigns_df = pd.read_csv(file_name)
+    add_marketing_campaigns(g, marketing_campaigns_df)
     
     # person_df = pd.read_csv(file_path + "prepped_" + file_name)
     # add_people(g, person_df)
@@ -120,9 +124,9 @@ async def app_startup():
     # )
 
     # TESTING:
-    # node_count = await asyncio.to_thread(
-    #     count_nodes_in_db, g, 'person'
-    # )
+    node_count = await asyncio.to_thread(
+        count_nodes_in_db, g, 'marketing_campaign'
+    )
     # edge_count = await asyncio.to_thread(
     #     count_edges_in_db, g, 'relates to'
     # )
@@ -132,7 +136,9 @@ async def app_startup():
     # edge_count = await asyncio.to_thread(
     #     count_edges_in_db, g, 'mentions'
     # )
-    people_by_lead_scores_count = count_people_by_keyword(g, "Lead Scores")
+
+    # people_by_lead_scores_count = count_people_by_keyword(g, "Lead Scores")
+
     # specific_edge_count = await asyncio.to_thread(
     #     count_specific_edges_in_db, g, "interested_in", "has_lead_scores", "yes"
     # )
@@ -145,9 +151,9 @@ async def app_startup():
     # node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'keyword', 'name', "Lead Scores"
     # )
-    # node_properties = await asyncio.to_thread(
-    #     check_node_properties, g, 'zymo_product', 'name', 'A4001-50'
-    # )
+    node_properties = await asyncio.to_thread(
+        check_node_properties, g, 'marketing_campaign', 'name', 'Quick DNA/RNA Water Kit Launch'
+    )
     # publication_node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'publication', 'doi', '10.1038/s41589-024-01685-3'
     # )
@@ -155,12 +161,12 @@ async def app_startup():
     #     check_node_properties, g, 'publication_product', 'name', 'qiagen rneasy mini kit'
     # )
     # print('QUERY RESULT:', query_result)
-    # print('NODE COUNT:', node_count)
+    print('NODE COUNT:', node_count)
     # print('EDGE COUNT:', edge_count)
-    print('LEAD SCORES PEOPLE COUNT:', people_by_lead_scores_count)
+    # print('LEAD SCORES PEOPLE COUNT:', people_by_lead_scores_count)
     # print('SPECIFIC EDGE COUNT:', specific_edge_count)
     # print('NAME LIST:', name_list)
-    # print('NODE PROPERTIES:', node_properties)
+    print('NODE PROPERTIES:', node_properties)
     # print('NODE PROPERTIES:', publication_node_properties)
     # print('NODE PROPERTIES:', publication_product_node_properties)
 

@@ -3,7 +3,7 @@ class MarketingCampaign:
     LABEL = "marketing_campaign"
 
     class PropertyKey:
-        CAMPAIGN_NAME = "campaign_name"
+        NAME = "name"
         TAGS = "tags"
         SUBJECT = "subject"
         LIST = "list"
@@ -27,3 +27,5 @@ class MarketingCampaign:
         BOUNCE_RATE = "bounce_rate"
         CAMPAIGN_ID = "campaign_id"
         CAMPAIGN_CHANNEL = "campaign_channel"
+        INGESTION_TAG = "ingestion_tag"
+        DATA_SOURCE = "data_source"

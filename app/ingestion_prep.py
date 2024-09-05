@@ -274,6 +274,11 @@ prep_edges_df(file_path=file_path, file_name=file_name, column_name="Keywords", 
 prep_edges_same_keyword_df(file_path=file_path, file_name=file_name, keyword="Lead Scores", target_node_label="keyword")
 
 # %%
+marketing_campaign_df = pd.read_csv('data/klaviyo/aug6_sep5_emails.csv')
+tagged_marketing_campaign_df = add_ingestion_tag_and_data_source_columns(df=marketing_campaign_df, tag="aug6_sep5", source="Klaviyo Analytics")
+tagged_marketing_campaign_df.to_csv('data/klaviyo/tagged_aug6_sep5_emails.csv')
+
+# %%
 # table1_path = 'data/qiagen_rneasy.csv'
 # table2_path = 'data/2019-2023_Leads_List_Test_deduped.csv'
 # new_table2_path = 'data/updated_2019-23_leads.csv'

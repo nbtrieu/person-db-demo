@@ -29,7 +29,15 @@ from tqdm import tqdm
 from datetime import datetime, timezone
 from itertools import islice
 from database import BulkQueryExecutor
-from data_objects import Person, Organization, Keyword, ZymoProduct, Publication, PublicationProduct
+from data_objects import (
+    Person,
+    Organization,
+    Keyword,
+    ZymoProduct,
+    Publication,
+    PublicationProduct,
+    MarketingCampaign
+)
 
 import nest_asyncio
 nest_asyncio.apply()
@@ -253,7 +261,7 @@ def add_zymo_products(g: GraphTraversalSource, zymo_products_df: pd.DataFrame):
     for index, row in tqdm(
         zymo_products_df.iterrows(),
         total=zymo_products_df.shape[0],
-        desc="Importing Zymo Products"
+        desc="Importing Zymo Products:"
     ):
         product_properties = {
             ZymoProduct.PropertyKey.UUID: row.get("Item name/SKU#"),
@@ -286,6 +294,50 @@ def add_zymo_products(g: GraphTraversalSource, zymo_products_df: pd.DataFrame):
         )
 
     query_executor.force_execute()
+
+def add_marketing_campaigns(g: GraphTraversalSource, marketing_campaigns_df: pd.DataFrame):
+    query_executor = BulkQueryExecutor(g, 100)
+
+    for index, row in tqdm(
+        marketing_campaigns_df.iterrows(),
+        total=marketing_campaigns_df.shape[0],
+        desc="Importing marketing campaigns:"
+    ):
+        marketing_campaign_properties = {
+            MarketingCampaign.PropertyKey.NAME: row.get("Campaign Name"),
+            MarketingCampaign.PropertyKey.TAGS: row.get("Tags"),
+            MarketingCampaign.PropertyKey.SUBJECT: row.get("Subject"),
+            MarketingCampaign.PropertyKey.LIST: row.get("List"),
+            MarketingCampaign.PropertyKey.SEND_TIME: row.get("Send Time"),
+            MarketingCampaign.PropertyKey.SEND_WEEKDAY: row.get("Send Weekday"),
+            MarketingCampaign.PropertyKey.TOTAL_RECIPIENTS: row.get("Total Recipients"),
+            MarketingCampaign.PropertyKey.UNIQUE_PLACED_ORDER: row.get("Unique Placed Order"),
+            MarketingCampaign.PropertyKey.PLACED_ORDER_RATE: row.get("Placed Order Rate"),
+            MarketingCampaign.PropertyKey.REVENUE: row.get("Revenue"),
+            MarketingCampaign.PropertyKey.UNIQUE_OPENS: row.get("Unique Opens"),
+            MarketingCampaign.PropertyKey.OPEN_RATE: row.get("Open Rate"),
+            MarketingCampaign.PropertyKey.TOTAL_OPENS: row.get("Total Opens"),
+            MarketingCampaign.PropertyKey.UNIQUE_CLICKS: row.get("Unique Clicks"),
+            MarketingCampaign.PropertyKey.CLICK_RATE: row.get("Click Rate"),
+            MarketingCampaign.PropertyKey.TOTAL_CLICKS: row.get("Total Clicks"),
+            MarketingCampaign.PropertyKey.UNSUBSCRIBES: row.get("Unsubscribes"),
+            MarketingCampaign.PropertyKey.SPAM_COMPLAINTS: row.get("Spam Complaints"),
+            MarketingCampaign.PropertyKey.SPAM_COMPLAINTS_RATE: row.get("Spam Complaints Rate"),
+            MarketingCampaign.PropertyKey.SUCCESSFUL_DELIVERIES: row.get("Successful Deliveries"),
+            MarketingCampaign.PropertyKey.BOUNCES: row.get("Bounces"),
+            MarketingCampaign.PropertyKey.BOUNCE_RATE: row.get("Bounce Rate"),
+            MarketingCampaign.PropertyKey.CAMPAIGN_ID: row.get("Campaign ID"),
+            MarketingCampaign.PropertyKey.CAMPAIGN_CHANNEL: row.get("Campaign Channel"),
+            MarketingCampaign.PropertyKey.INGESTION_TAG: row.get("Ingestion Tag"),
+            MarketingCampaign.PropertyKey.DATA_SOURCE: row.get("Data Source"),
+        }
+
+        query_executor.add_vertex(
+            label=MarketingCampaign.LABEL,
+            properties=marketing_campaign_properties
+        )
+    
+    query_executor.force_execute()   
 
 def load_json_file(file_path):
     with open(file_path, 'r') as file:
@@ -761,5 +813,3 @@ def get_path(g: GraphTraversalSource):
 # # %%
 # person_count = count_unique_people(g)
 # print(person_count)
-
-# # %%
