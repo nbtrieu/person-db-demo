@@ -6,3 +6,4 @@ from .project import Project
 from .event import Event
 from .zymo_product import ZymoProduct
 from .publication_product import PublicationProduct
+from .marketing_campaign import MarketingCampaign
