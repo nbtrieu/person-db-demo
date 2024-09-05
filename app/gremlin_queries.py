@@ -68,6 +68,16 @@ def count_specific_nodes_in_db(g: GraphTraversalSource, label: str, property_key
     specific_node_count = g.V().has(label, property_key, property_value).count().next()
     return specific_node_count
 
+def count_people_by_keyword(g: GraphTraversalSource, keyword: str):
+    return (
+        g.V()
+        .has("keyword", "name", keyword)
+        .bothE()
+        .outV()
+        .hasLabel("person")
+        .count()
+        .next()
+    )
 
 def count_edges_in_db(g: GraphTraversalSource, label: str):
     edge_count = g.E().hasLabel(label).count().next()

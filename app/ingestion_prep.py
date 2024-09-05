@@ -209,84 +209,69 @@ def extract_unique_keywords(contact_df: pd.DataFrame):
     return unique_keywords_df
 
 
-def prep_person_df(file_name: str, tag: str, source: str):
-    person_df = pd.read_csv('data/' + file_name).drop_duplicates()
+def prep_person_df(file_path: str, file_name: str, tag: str, source: str):
+    person_df = pd.read_csv(file_path + file_name).drop_duplicates()
     person_df = harmonize_column_titles(person_df)
     person_df = add_uuid_column(person_df)
     person_df = add_ingestion_tag_and_data_source_columns(person_df, tag, source)
-    person_df.to_csv('data/prepped_' + file_name, index=False)
+    person_df.to_csv(file_path + 'prepped_' + file_name, index=False)
 
 
 def prep_organization_df(file_name: str):
-    person_df = pd.read_csv('data/prepped_' + file_name).drop_duplicates()
+    person_df = pd.read_csv(file_path + 'prepped_' + file_name).drop_duplicates()
     person_df['Organization Standardized Name'] = person_df['Organization'].str.strip().str.lower()
-    
-    # Create a DataFrame with original and standardized organization names
     original_organizations_df = person_df[['Organization Standardized Name', 'Organization']].drop_duplicates()
-    
-    # Keep the original formatting for the display name
     original_organizations_df = original_organizations_df.rename(columns={"Organization": "Display Name"})
-    
-    # Get unique standardized organization names
     unique_organizations_series = person_df['Organization Standardized Name'].dropna().drop_duplicates().reset_index(drop=True)
-    
-    # Convert to DataFrame
     unique_organizations_df = unique_organizations_series.to_frame()
-    
-    # Harmonize column titles
     unique_organizations_df = harmonize_column_titles(unique_organizations_df)
-    
-    # Merge to add the Display Name column
     unique_organizations_df = pd.merge(unique_organizations_df, original_organizations_df, on='Organization Standardized Name', how='left')
-    
-    # Remove rows with duplicate values for the "Organization Standardized Name"
     unique_organizations_df = unique_organizations_df.drop_duplicates(subset='Organization Standardized Name')
-    
-    # Save to CSV
-    unique_organizations_df.to_csv('data/organization_list_' + file_name, index=False)
+    unique_organizations_df.to_csv(file_path + 'organization_list_' + file_name, index=False)
 
 
-def prep_keyword_df(file_name: str):
-    person_df = pd.read_csv('data/' + file_name).drop_duplicates()
+def prep_keyword_df(file_path: str, file_name: str):
+    person_df = pd.read_csv(file_path + file_name).drop_duplicates()
     person_df = harmonize_column_titles(person_df)
     unique_keywords_df = extract_unique_keywords(person_df)
-    unique_keywords_df.to_csv('data/keyword_list_' + file_name, index=False)
+    unique_keywords_df.to_csv(file_path + 'keyword_list_' + file_name, index=False)
 
 
-def prep_edges_df(file_name: str, column_name: str, target_node_label: str):
-    prepped_person_df = pd.read_csv('data/prepped_' + file_name)
+def prep_edges_df(file_path: str, file_name: str, column_name: str, target_node_label: str):
+    prepped_person_df = pd.read_csv(file_path + 'prepped_' + file_name)
     prepped_person_df = harmonize_column_titles(prepped_person_df)
     prepped_person_df[column_name].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
     cleaned_df = prepped_person_df.dropna(subset=[column_name]).reset_index(drop=True)
-    cleaned_df.to_csv('data/cleaned_' + target_node_label + '_' + file_name, index=False)
+    cleaned_df.to_csv(file_path + 'cleaned_' + target_node_label + '_' + file_name, index=False)
 
 
-def prep_edges_same_keyword_df(file_name: str, keyword: str, target_node_label: str):
-    prepped_person_df = pd.read_csv('data/prepped_' + file_name)
+def prep_edges_same_keyword_df(file_path: str, file_name: str, keyword: str, target_node_label: str):
+    prepped_person_df = pd.read_csv(file_path + 'prepped_' + file_name)
     prepped_person_df = harmonize_column_titles(prepped_person_df)
     prepped_person_df["Keyword"] = keyword
-    prepped_person_df.to_csv('data/keyword_added_' + target_node_label + '_' + file_name, index=False)
+    prepped_person_df.to_csv(file_path + 'keyword_added_' + target_node_label + '_' + file_name, index=False)
 
 # %%
+file_path = 'data/lead_scoring/'
 file_name = 'lead_scoring_data_2021-24.csv'
 
 # %%
-prep_person_df(file_name=file_name, tag="lead_scoring", source="Lead Scoring Data 2021-24")
+prep_person_df(file_path=file_path, file_name=file_name, tag="lead_scoring", source="Lead Scoring Data 2021-24")
 
 # %%
-prep_organization_df(file_name=file_name)
+prep_organization_df(file_path=file_path, file_name=file_name)
 
 # %%
-prep_keyword_df(file_name=file_name)
+prep_keyword_df(file_path=file_path, file_name=file_name)
 
 # %%
-prep_edges_df(file_name=file_name, column_name="Organization", target_node_label="organization")
+prep_edges_df(file_path=file_path, file_name=file_name, column_name="Organization", target_node_label="organization")
 
 # %%
-prep_edges_df(file_name=file_name, column_name="Keywords", target_node_label="keyword")
+prep_edges_df(file_path=file_path, file_name=file_name, column_name="Keywords", target_node_label="keyword")
 
 # %%
-prep_edges_same_keyword_df(file_name=file_name, keyword="Lead Scores", target_node_label="keyword")
+prep_edges_same_keyword_df(file_path=file_path, file_name=file_name, keyword="Lead Scores", target_node_label="keyword")
 
 # %%
 # table1_path = 'data/qiagen_rneasy.csv'
