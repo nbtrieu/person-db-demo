@@ -4,7 +4,6 @@ class Person:
 
     class PropertyKey:
         UUID = "uuid"  # via random UUID generator
-        CUSTOMER_ID = "customer_id"
         FIRST_NAME = "first_name"
         LAST_NAME = "last_name"
         FULL_NAME = "full_name"
@@ -38,3 +37,6 @@ class Person:
         SALES_TIER = "sales_tier"
         MESSAGE_TIER = "message_tier"
         ORDERS_TIER = "orders_tier"
+        OPENS = "opens"
+        CLICKS = "clicks"
+        CONVERSIONS = "conversions"

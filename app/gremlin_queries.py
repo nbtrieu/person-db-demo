@@ -28,7 +28,7 @@ from gremlin_python.process.traversal import (
 from tqdm import tqdm
 from datetime import datetime, timezone
 from itertools import islice
-from database import BulkQueryExecutor
+from database import BulkQueryExecutor, EdgeAdder
 from data_objects import (
     Person,
     Organization,
@@ -38,6 +38,9 @@ from data_objects import (
     PublicationProduct,
     MarketingCampaign
 )
+
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
 import nest_asyncio
 nest_asyncio.apply()
@@ -133,7 +136,7 @@ def check_node_properties(g: GraphTraversalSource, label: str, property_key: str
         .hasLabel(label)
         .has(property_key, property_value)
         .project('properties', 'connected_nodes')
-        .by(__.valueMap())
+        .by(__.valueMap(True))
         .by(__.both().valueMap().fold())
         .toList()
     )
@@ -150,7 +153,7 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
     ):
         person_properties = {
             Person.PropertyKey.UUID: row.get("UUID"),
-            ** ({Person.PropertyKey.CUSTOMER_ID: row["Customer ID"]} if "Customer ID" in contact_df.columns and not pd.isnull(row.get("Customer ID")) else {}),
+            # Fields for SciLeads metadata
             ** ({Person.PropertyKey.FIRST_NAME: row["First Name"]} if "First Name" in contact_df.columns and not pd.isnull(row.get("First Name")) else {}),
             ** ({Person.PropertyKey.LAST_NAME: row["Last Name"]} if "Last Name" in contact_df.columns and not pd.isnull(row.get("Last Name")) else {}),
             ** ({Person.PropertyKey.FULL_NAME: row["Full Name"]} if "Full Name" in contact_df.columns and not pd.isnull(row.get("Full Name")) else {}),
@@ -170,8 +173,10 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
             ** ({Person.PropertyKey.PURCHASING_AGENT: row["Purchasing Agent"]} if "Purchasing Agent" in contact_df.columns and not pd.isnull(row.get("Purchasing Agent")) else {}),
             ** ({Person.PropertyKey.VALIDATED_LEAD_STATUS: row["Validated Lead Status"]} if "Validated Lead Status" in contact_df.columns and not pd.isnull(row.get("Validated Lead Status")) else {}),
             ** ({Person.PropertyKey.STATUS: row["Status"]} if "Status" in contact_df.columns and not pd.isnull(row.get("Status")) else {}),
+            # Fields for database housekeeping
             Person.PropertyKey.INGESTION_TAG: row.get("Ingestion Tag", None),
             Person.PropertyKey.DATA_SOURCE: row.get("Data Source", None),
+            # Fields for lead scoring metadata
             ** ({Person.PropertyKey.NUMBER_OF_CASES: row["Number of Cases"]} if "Number of Cases" in contact_df.columns and not pd.isnull(row.get("Number of Cases")) else {}),
             ** ({Person.PropertyKey.SCORE_CASE: row["Score Case"]} if "Score Case" in contact_df.columns and not pd.isnull(row.get("Score Case")) else {}),
             ** ({Person.PropertyKey.QUANTITY: row["Quantity"]} if "Quantity" in contact_df.columns and not pd.isnull(row.get("Quantity")) else {}),
@@ -184,8 +189,10 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
             ** ({Person.PropertyKey.SALES_TIER: row["Sales Tier"]} if "Sales Tier" in contact_df.columns and not pd.isnull(row.get("Sales Tier")) else {}),
             ** ({Person.PropertyKey.MESSAGE_TIER: row["Message Tier"]} if "Message Tier" in contact_df.columns and not pd.isnull(row.get("Message Tier")) else {}),
             ** ({Person.PropertyKey.ORDERS_TIER: row["Orders Tier"]} if "Orders Tier" in contact_df.columns and not pd.isnull(row.get("Orders Tier")) else {}),
-            ** ({Person.PropertyKey.FULL_NAME: row["Full Name"]} if "Full Name" in contact_df.columns and not pd.isnull(row.get("Full Name")) else {}),
-            ** ({Person.PropertyKey.TITLE: row["Title"]} if "Title" in contact_df.columns and not pd.isnull(row.get("Title")) else {})
+            # Fields for marketing campaign metadata
+            ** ({Person.PropertyKey.OPENS: row["Opens"]} if "Opens" in contact_df.columns and not pd.isnull(row.get("Opens")) else {}),
+            ** ({Person.PropertyKey.CLICKS: row["Clicks"]} if "Clicks" in contact_df.columns and not pd.isnull(row.get("Clicks")) else {}),
+            ** ({Person.PropertyKey.CONVERSIONS: row["Conversions"]} if "Conversions" in contact_df.columns and not pd.isnull(row.get("Conversions")) else {})
         }
 
         query_executor.add_vertex(
@@ -296,14 +303,15 @@ def add_zymo_products(g: GraphTraversalSource, zymo_products_df: pd.DataFrame):
     query_executor.force_execute()
 
 def add_marketing_campaigns(g: GraphTraversalSource, marketing_campaigns_df: pd.DataFrame):
-    query_executor = BulkQueryExecutor(g, 100)
+    query_executor = BulkQueryExecutor(g, 50)
 
     for index, row in tqdm(
         marketing_campaigns_df.iterrows(),
         total=marketing_campaigns_df.shape[0],
-        desc="Importing marketing campaigns:"
+        desc="Importing marketing campaigns"
     ):
         marketing_campaign_properties = {
+            MarketingCampaign.PropertyKey.UUID: row.get("Campaign ID"),
             MarketingCampaign.PropertyKey.NAME: row.get("Campaign Name"),
             MarketingCampaign.PropertyKey.TAGS: row.get("Tags"),
             MarketingCampaign.PropertyKey.SUBJECT: row.get("Subject"),
@@ -401,10 +409,10 @@ def add_publication_products(g: GraphTraversalSource, publication_products: list
     
     query_executor.force_execute()
 
-def create_id_dict(g: GraphTraversalSource, vertex_label: str, primary_property_label: str):
+def create_id_dict(g: GraphTraversalSource, node_type: str, primary_property_label: str):
     node_list = (
         g.V()
-        .has_label(vertex_label)
+        .has_label(node_type)
         .project("id", primary_property_label)
         .by(__.id_())
         .by(__.values(primary_property_label))
@@ -486,6 +494,7 @@ def add_edges_person_keyword(
 
         # Check if the current row has "lead_scoring" in the "Ingestion Tag" column
         has_lead_scores = row.get("Ingestion Tag") == "lead_scoring"
+        has_klaviyo_data = row.get("Ingestion Tag") == "klaviyo"
 
         for keyword in keywords:
             keyword_uuid_value = keyword
@@ -498,34 +507,113 @@ def add_edges_person_keyword(
                 
                 if has_lead_scores:
                     edge.property("has_lead_scores", "yes")
+
+                if has_klaviyo_data:
+                    edge.property("has_klaviyo_data", "yes")
                 
                 edge.iterate()
 
+def add_edges_person_keyword_parallel(
+    g: GraphTraversalSource,
+    cleaned_interests_contact_df: pd.DataFrame,
+    batch_size: int = 100
+):
+    person_id_dict = create_id_dict(g, "person", "uuid")
+    keyword_id_dict = create_id_dict(g, "keyword", "uuid")
+
+    # Lock to prevent race conditions when updating the progress bar
+    pbar_lock = threading.Lock()
+
+    def process_batch(batch, pbar):
+        for _, row in batch.iterrows():
+            person_uuid_value = row.get("UUID")
+            person_graph_id = person_id_dict.get(person_uuid_value)
+
+            interests = row["Keywords"]
+            keywords = [keyword.strip() for keyword in interests.split(',')]
+
+            has_lead_scores = row.get("Ingestion Tag") == "lead_scoring"
+            has_klaviyo_data = row.get("Ingestion Tag") == "klaviyo"
+
+            for keyword in keywords:
+                keyword_uuid_value = keyword
+                keyword_graph_id = keyword_id_dict.get(keyword_uuid_value)
+
+                if person_graph_id is not None and keyword_graph_id is not None:
+                    edge = g.V(person_graph_id).addE("interested_in").to(__.V(keyword_graph_id))
+
+                    if has_lead_scores:
+                        edge = edge.property("has_lead_scores", "yes")
+
+                    if has_klaviyo_data:
+                        edge = edge.property("has_klaviyo_data", "yes")
+
+                    edge.iterate()
+
+            # Safely update the progress bar
+            with pbar_lock:
+                pbar.update(1)
+
+    # Calculate the total number of rows, not batches
+    total_rows = len(cleaned_interests_contact_df)
+
+    # Use ThreadPoolExecutor with tqdm to display progress
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        with tqdm(total=total_rows, desc="Processing rows") as pbar:
+            futures = []
+            for i in range(0, total_rows, batch_size):
+                batch = cleaned_interests_contact_df.iloc[i:i + batch_size]
+                futures.append(executor.submit(process_batch, batch, pbar))
+            
+            # Wait for all threads to complete
+            for future in futures:
+                future.result()
+
+def add_edges_person_marketing_campaign(
+    g: GraphTraversalSource,
+    person_marketing_campaign_df: pd.DataFrame
+):
+    person_marketing_campaign_edge_adder = EdgeAdder(
+        g=g,
+        source_node="person",
+        target_node="marketing_campaign",
+        source_id_col="UUID",
+        target_id_col="Campaign ID",
+        edge_label="is_recipient_of"
+    )
+
+    person_marketing_campaign_edge_adder.add_edges(person_marketing_campaign_df)
 
 def add_edges_publication_keyword(
     g: GraphTraversalSource,
     publications: list
 ):
-    # query_executor = BulkQueryExecutor(g, 100)
-    
-    publication_id_dict = create_id_dict(g, "publication", "doi")
-    keyword_id_dict = create_id_dict(g, "keyword", "uuid")
+    publication_keyword_edge_adder = EdgeAdder(
+        g=g,
+        source_node="publication",
+        target_node="keyword",
+        source_id_col="doi",
+        target_id_col="search_term",
+        edge_label="relates_to"
+    )
 
-    for publication in tqdm(
-        publications,
-        total=len(publications),
-        desc="Adding Publication-Keyword Edges"
-    ):
-        publication_doi_value = publication["doi"]
-        keyword_uuid_value = publication["search_term"]
+    publication_keyword_edge_adder.add_edges(publications)
 
-        publication_graph_id = publication_id_dict.get(publication_doi_value)
-        keyword_graph_id = keyword_id_dict.get(keyword_uuid_value)
 
-        g.V(publication_graph_id).addE("relates_to").to(__.V(keyword_graph_id)).iterate()
-    
-    # query_executor.force_execute()
+def add_edges_marketing_campaign_keyword(
+    g: GraphTraversalSource,
+    marketing_campaign_keyword_df: pd.DataFrame
+):
+    marketing_campaign_keyword_edge_adder = EdgeAdder(
+        g=g,
+        source_node="marketing_campaign",
+        target_node="keyword",
+        source_id_col="Campaign ID",
+        target_id_col="Keywords",
+        edge_label="is_searchable_by"
+    )
 
+    marketing_campaign_keyword_edge_adder.add_edges(marketing_campaign_keyword_df)
 
 def add_property_same_value(
     g: GraphTraversalSource,
@@ -567,7 +655,7 @@ def add_individual_keyword(g: GraphTraversalSource, keyword: str):
 
 # %% QUERYING DATA:
 
-#  SEARCH BY KEYWORD:
+#  SEARCH ALL NODES BY KEYWORD:
 def get_people_by_keyword(g: GraphTraversalSource, keyword: str):
     return (
         g.V()
@@ -619,6 +707,21 @@ def get_publication_products_by_keyword(g: GraphTraversalSource, keyword: str):
         .dedup()
         .toList()
     )
+
+
+def get_marketing_campaigns_by_keyword(g: GraphTraversalSource, keyword: str):
+    return (
+        g.V()
+        .has("keyword", "name", keyword)
+        .bothE()
+        .outV()
+        .hasLabel("marketing_campaign")
+        .valueMap()
+        .dedup()
+        .toList()
+    )
+
+# SEARCH PERSON NODES
 
 def get_organization_by_person_name(g: GraphTraversalSource, person_name: str):
     return (

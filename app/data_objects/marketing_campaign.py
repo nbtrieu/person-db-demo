@@ -3,6 +3,7 @@ class MarketingCampaign:
     LABEL = "marketing_campaign"
 
     class PropertyKey:
+        UUID = "uuid"  # same as campaign_id
         NAME = "name"
         TAGS = "tags"
         SUBJECT = "subject"

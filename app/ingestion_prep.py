@@ -148,7 +148,13 @@ def harmonize_column_titles(df: pd.DataFrame) -> pd.DataFrame:
         "Message Tier": "Message Tier",
         "Orders Tier": "Orders Tier",
         "Department/Contact": "Full Name",
-        "Job Title": "Title"
+        "Job Title": "Title",
+        "Opens": "Opens",
+        "opens": "Opens",
+        "Clicks": "Clicks",
+        "clicks": "Clicks",
+        "Conversions": "Conversions",
+        "conversions": "Conversions"
     }
 
     # Rename the columns in the DataFrame
@@ -214,11 +220,13 @@ def prep_person_df(file_path: str, file_name: str, tag: str, source: str):
     person_df = harmonize_column_titles(person_df)
     person_df = add_uuid_column(person_df)
     person_df = add_ingestion_tag_and_data_source_columns(person_df, tag, source)
-    person_df.to_csv(file_path + 'prepped_' + file_name, index=False)
+    if "Full Name" not in person_df.columns:
+        person_df["Full Name"] = person_df["First Name"] + " " + person_df["Last Name"]
+    person_df.to_csv(f'{file_path}/prepped_{file_name}', index=False)
 
 
 def prep_organization_df(file_name: str):
-    person_df = pd.read_csv(file_path + 'prepped_' + file_name).drop_duplicates()
+    person_df = pd.read_csv(f'{file_path}/prepped_{file_name}').drop_duplicates()
     person_df['Organization Standardized Name'] = person_df['Organization'].str.strip().str.lower()
     original_organizations_df = person_df[['Organization Standardized Name', 'Organization']].drop_duplicates()
     original_organizations_df = original_organizations_df.rename(columns={"Organization": "Display Name"})
@@ -227,36 +235,41 @@ def prep_organization_df(file_name: str):
     unique_organizations_df = harmonize_column_titles(unique_organizations_df)
     unique_organizations_df = pd.merge(unique_organizations_df, original_organizations_df, on='Organization Standardized Name', how='left')
     unique_organizations_df = unique_organizations_df.drop_duplicates(subset='Organization Standardized Name')
-    unique_organizations_df.to_csv(file_path + 'organization_list_' + file_name, index=False)
+    unique_organizations_df.to_csv(f'{file_path}/organization_list_{file_name}', index=False)
 
 
 def prep_keyword_df(file_path: str, file_name: str):
-    person_df = pd.read_csv(file_path + file_name).drop_duplicates()
+    person_df = pd.read_csv({file_path}/{file_name}).drop_duplicates()
     person_df = harmonize_column_titles(person_df)
     unique_keywords_df = extract_unique_keywords(person_df)
-    unique_keywords_df.to_csv(file_path + 'keyword_list_' + file_name, index=False)
+    unique_keywords_df.to_csv(f'{file_path}/keyword_list_{file_name}', index=False)
 
 
-def prep_edges_df(file_path: str, file_name: str, column_name: str, target_node_label: str):
-    prepped_person_df = pd.read_csv(file_path + 'prepped_' + file_name)
-    prepped_person_df = harmonize_column_titles(prepped_person_df)
-    prepped_person_df[column_name].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
-    cleaned_df = prepped_person_df.dropna(subset=[column_name]).reset_index(drop=True)
-    cleaned_df.to_csv(file_path + 'cleaned_' + target_node_label + '_' + file_name, index=False)
+def prep_edges_df(file_path: str, file_name: str, column_name: str, source_node_label: str, target_node_label: str):
+    prepped_source_df = pd.read_csv(f'{file_path}/prepped_{file_name}')
+    prepped_source_df = harmonize_column_titles(prepped_source_df)
+    prepped_source_df[column_name].replace(["- None -", "N/A", "null"], np.nan, inplace=True)
+    cleaned_df = prepped_source_df.dropna(subset=[column_name]).reset_index(drop=True)
+    cleaned_df.to_csv(f'{file_path}/edge_{source_node_label}_{target_node_label}_{file_name}', index=False)
 
 
-def prep_edges_same_keyword_df(file_path: str, file_name: str, keyword: str, target_node_label: str):
-    prepped_person_df = pd.read_csv(file_path + 'prepped_' + file_name)
-    prepped_person_df = harmonize_column_titles(prepped_person_df)
-    prepped_person_df["Keyword"] = keyword
-    prepped_person_df.to_csv(file_path + 'keyword_added_' + target_node_label + '_' + file_name, index=False)
+def prep_edges_same_keyword_df(file_path: str, original_file_name: str, keywords: list, target_node_label: str):
+    prepped_person_df = pd.read_csv(f'{file_path}/prepped_{original_file_name}')
+    keyword_str = ', '.join(keywords)
+    prepped_person_df["Keywords"] = keyword_str
+    prepped_person_df.to_csv(f'{file_path}/keyword_added_{target_node_label}_{original_file_name}', index=False)
+
+def prep_edges_same_campaign_df(file_path: str, original_file_name: str, campaign_id: str, target_node_label: str): 
+    marketing_recipients_df = pd.read_csv(f'{file_path}/keyword_added_{target_node_label}_{file_name}')
+    marketing_recipients_df["Campaign ID"] = campaign_id
+    marketing_recipients_df.to_csv(f'{file_path}/campaign_added_{target_node_label}_{original_file_name}', index=False)
 
 # %%
-file_path = 'data/lead_scoring/'
-file_name = 'lead_scoring_data_2021-24.csv'
+file_path = 'data/klaviyo'
+file_name = 'recipients_30YA_sep_promo.csv'
 
 # %%
-prep_person_df(file_path=file_path, file_name=file_name, tag="lead_scoring", source="Lead Scoring Data 2021-24")
+prep_person_df(file_path=file_path, file_name=file_name, tag="klaviyo_30YA_sep_promo", source="Klaviyo Recipients 30YA September Promo")
 
 # %%
 prep_organization_df(file_path=file_path, file_name=file_name)
@@ -271,12 +284,16 @@ prep_edges_df(file_path=file_path, file_name=file_name, column_name="Organizatio
 prep_edges_df(file_path=file_path, file_name=file_name, column_name="Keywords", target_node_label="keyword")
 
 # %%
-prep_edges_same_keyword_df(file_path=file_path, file_name=file_name, keyword="Lead Scores", target_node_label="keyword")
+klaviyo_keywords = ["Klaviyo", "Emails", "Marketing", "Marketing Campaigns", "Email Marketing Data"]
+prep_edges_same_keyword_df(file_path=file_path, original_file_name=file_name, keywords=klaviyo_keywords, target_node_label="person_node")
 
 # %%
-marketing_campaign_df = pd.read_csv('data/klaviyo/aug6_sep5_emails.csv')
+marketing_campaign_df = pd.read_csv('data/klaviyo/all_sent_campaigns.csv')
 tagged_marketing_campaign_df = add_ingestion_tag_and_data_source_columns(df=marketing_campaign_df, tag="aug6_sep5", source="Klaviyo Analytics")
-tagged_marketing_campaign_df.to_csv('data/klaviyo/tagged_aug6_sep5_emails.csv')
+tagged_marketing_campaign_df.to_csv('data/klaviyo/prepped_all_sent_campaigns.csv')
+
+# %%
+prep_edges_same_campaign_df(file_path=file_path, original_file_name=file_name, campaign_id='01J722YH98T4N9Y67S65HBDKGE', target_node_label="person_node")
 
 # %%
 # table1_path = 'data/qiagen_rneasy.csv'
