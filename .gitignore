@@ -5,6 +5,7 @@ app/data/**
 !app/data/**/
 !app/data/**/.gitkeep
 !app/data/README.md
+app/outputs/**
 
 # Ignore files (but not sub-folders) in the logs folder
 logs/**
