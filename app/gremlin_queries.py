@@ -484,7 +484,7 @@ def add_edges_person_keyword(
     exploded_df = person_keyword_df.explode("Keywords").reset_index(drop=True)
 
     exploded_df["edge_properties"] = exploded_df.apply(get_edge_properties, axis=1)
-    exploded_df.to_csv('exploded_df_output.csv', index=False)
+    exploded_df.to_csv('outputs/exploded_df_output.csv', index=False)
     
     person_keyword_edge_adder = EdgeAdder(
         g=g,
@@ -496,62 +496,6 @@ def add_edges_person_keyword(
     )
 
     person_keyword_edge_adder.add_edges(exploded_df)
-
-def add_edges_person_keyword_parallel(
-    g: GraphTraversalSource,
-    cleaned_interests_contact_df: pd.DataFrame,
-    batch_size: int = 100
-):
-    person_id_dict = create_id_dict(g, "person", "uuid")
-    keyword_id_dict = create_id_dict(g, "keyword", "uuid")
-
-    # Lock to prevent race conditions when updating the progress bar
-    pbar_lock = threading.Lock()
-
-    def process_batch(batch, pbar):
-        for _, row in batch.iterrows():
-            person_uuid_value = row.get("UUID")
-            person_graph_id = person_id_dict.get(person_uuid_value)
-
-            interests = row["Keywords"]
-            keywords = [keyword.strip() for keyword in interests.split(',')]
-
-            has_lead_scores = row.get("Ingestion Tag") == "lead_scoring"
-            has_klaviyo_data = row.get("Ingestion Tag") == "klaviyo"
-
-            for keyword in keywords:
-                keyword_uuid_value = keyword
-                keyword_graph_id = keyword_id_dict.get(keyword_uuid_value)
-
-                if person_graph_id is not None and keyword_graph_id is not None:
-                    edge = g.V(person_graph_id).addE("interested_in").to(__.V(keyword_graph_id))
-
-                    if has_lead_scores:
-                        edge = edge.property("has_lead_scores", "yes")
-
-                    if has_klaviyo_data:
-                        edge = edge.property("has_klaviyo_data", "yes")
-
-                    edge.iterate()
-
-            # Safely update the progress bar
-            with pbar_lock:
-                pbar.update(1)
-
-    # Calculate the total number of rows, not batches
-    total_rows = len(cleaned_interests_contact_df)
-
-    # Use ThreadPoolExecutor with tqdm to display progress
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        with tqdm(total=total_rows, desc="Processing rows") as pbar:
-            futures = []
-            for i in range(0, total_rows, batch_size):
-                batch = cleaned_interests_contact_df.iloc[i:i + batch_size]
-                futures.append(executor.submit(process_batch, batch, pbar))
-            
-            # Wait for all threads to complete
-            for future in futures:
-                future.result()
 
 def add_edges_person_marketing_campaign(
     g: GraphTraversalSource,
@@ -566,7 +510,8 @@ def add_edges_person_marketing_campaign(
         return properties
 
     person_marketing_campaign_df["edge_properties"] = person_marketing_campaign_df.apply(get_edge_properties, axis=1)
-    
+    person_marketing_campaign_df.to_csv('outputs/person_marketing_campaign_edges_df.csv', index=False)
+
     person_marketing_campaign_edge_adder = EdgeAdder(
         g=g,
         source_node="person",
@@ -574,7 +519,6 @@ def add_edges_person_marketing_campaign(
         source_id_col="UUID",
         target_id_col="Campaign ID",
         edge_label="is_recipient_of",
-        edge_properties=person_marketing_campaign_df["edge_properties"]
     )
 
     person_marketing_campaign_edge_adder.add_edges(person_marketing_campaign_df)
