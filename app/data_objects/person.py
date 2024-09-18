@@ -37,6 +37,3 @@ class Person:
         SALES_TIER = "sales_tier"
         MESSAGE_TIER = "message_tier"
         ORDERS_TIER = "orders_tier"
-        OPENS = "opens"
-        CLICKS = "clicks"
-        CONVERSIONS = "conversions"

@@ -189,10 +189,6 @@ def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
             ** ({Person.PropertyKey.SALES_TIER: row["Sales Tier"]} if "Sales Tier" in contact_df.columns and not pd.isnull(row.get("Sales Tier")) else {}),
             ** ({Person.PropertyKey.MESSAGE_TIER: row["Message Tier"]} if "Message Tier" in contact_df.columns and not pd.isnull(row.get("Message Tier")) else {}),
             ** ({Person.PropertyKey.ORDERS_TIER: row["Orders Tier"]} if "Orders Tier" in contact_df.columns and not pd.isnull(row.get("Orders Tier")) else {}),
-            # Fields for marketing campaign metadata
-            ** ({Person.PropertyKey.OPENS: row["Opens"]} if "Opens" in contact_df.columns and not pd.isnull(row.get("Opens")) else {}),
-            ** ({Person.PropertyKey.CLICKS: row["Clicks"]} if "Clicks" in contact_df.columns and not pd.isnull(row.get("Clicks")) else {}),
-            ** ({Person.PropertyKey.CONVERSIONS: row["Conversions"]} if "Conversions" in contact_df.columns and not pd.isnull(row.get("Conversions")) else {})
         }
 
         query_executor.add_vertex(
@@ -472,46 +468,34 @@ def add_edges_person_organization(
 
     query_executor.force_execute()
 
-
 def add_edges_person_keyword(
     g: GraphTraversalSource,
-    cleaned_interests_contact_df: pd.DataFrame,
+    person_keyword_df: pd.DataFrame,
 ):
-    person_id_dict = create_id_dict(g, "person", "uuid")
-    keyword_id_dict = create_id_dict(g, "keyword", "uuid")
+    def get_edge_properties(row):
+        properties = {}
+        if "lead_scoring" in row.get("Ingestion Tag", ""):
+            properties["has_lead_scores"] = "yes"
+        if "klaviyo" in row.get("Ingestion Tag", ""):
+            properties["has_klaviyo_data"] = "yes"
+        return properties
 
-    for _, row in tqdm(
-        cleaned_interests_contact_df.iterrows(),
-        total=cleaned_interests_contact_df.shape[0],
-        desc="Adding person-keyword edges"
-    ):
-        person_uuid_value = row.get("UUID")
-        person_graph_id = person_id_dict.get(person_uuid_value)
+    person_keyword_df.loc[:, "Keywords"] = person_keyword_df["Keywords"].apply(lambda x: x.split(', '))
+    exploded_df = person_keyword_df.explode("Keywords").reset_index(drop=True)
 
-        # This should be within the row loop to process each row's interests
-        interests = row["Keywords"]
-        keywords = [keyword.strip() for keyword in interests.split(',')]
+    exploded_df["edge_properties"] = exploded_df.apply(get_edge_properties, axis=1)
+    exploded_df.to_csv('exploded_df_output.csv', index=False)
+    
+    person_keyword_edge_adder = EdgeAdder(
+        g=g,
+        source_node="person",
+        target_node="keyword",
+        source_id_col="UUID",
+        target_id_col="Keywords",
+        edge_label="interested_in"
+    )
 
-        # Check if the current row has "lead_scoring" in the "Ingestion Tag" column
-        has_lead_scores = row.get("Ingestion Tag") == "lead_scoring"
-        has_klaviyo_data = row.get("Ingestion Tag") == "klaviyo"
-
-        for keyword in keywords:
-            keyword_uuid_value = keyword
-            keyword_graph_id = keyword_id_dict.get(keyword_uuid_value)
-
-            # Ensure both person and keyword IDs exist before creating an edge
-            if person_graph_id is not None and keyword_graph_id is not None:
-                # Add edge with or without the "has_lead_scores" property based on the Ingestion Tag value
-                edge = g.V(person_graph_id).addE("interested_in").to(__.V(keyword_graph_id))
-                
-                if has_lead_scores:
-                    edge.property("has_lead_scores", "yes")
-
-                if has_klaviyo_data:
-                    edge.property("has_klaviyo_data", "yes")
-                
-                edge.iterate()
+    person_keyword_edge_adder.add_edges(exploded_df)
 
 def add_edges_person_keyword_parallel(
     g: GraphTraversalSource,
@@ -573,13 +557,24 @@ def add_edges_person_marketing_campaign(
     g: GraphTraversalSource,
     person_marketing_campaign_df: pd.DataFrame
 ):
+    def get_edge_properties(row):
+        properties = {
+            "opens": row["Opens"],
+            "clicks": row["Clicks"],
+            "conversions": row["Conversions"]
+        }
+        return properties
+
+    person_marketing_campaign_df["edge_properties"] = person_marketing_campaign_df.apply(get_edge_properties, axis=1)
+    
     person_marketing_campaign_edge_adder = EdgeAdder(
         g=g,
         source_node="person",
         target_node="marketing_campaign",
         source_id_col="UUID",
         target_id_col="Campaign ID",
-        edge_label="is_recipient_of"
+        edge_label="is_recipient_of",
+        edge_properties=person_marketing_campaign_df["edge_properties"]
     )
 
     person_marketing_campaign_edge_adder.add_edges(person_marketing_campaign_df)

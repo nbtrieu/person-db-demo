@@ -216,7 +216,7 @@ def extract_unique_keywords(contact_df: pd.DataFrame):
 
 
 def prep_person_df(file_path: str, file_name: str, tag: str, source: str):
-    person_df = pd.read_csv(file_path + file_name).drop_duplicates()
+    person_df = pd.read_csv(f'{file_path}/{file_name}').drop_duplicates()
     person_df = harmonize_column_titles(person_df)
     person_df = add_uuid_column(person_df)
     person_df = add_ingestion_tag_and_data_source_columns(person_df, tag, source)
@@ -286,11 +286,6 @@ prep_edges_df(file_path=file_path, file_name=file_name, column_name="Keywords", 
 # %%
 klaviyo_keywords = ["Klaviyo", "Emails", "Marketing", "Marketing Campaigns", "Email Marketing Data"]
 prep_edges_same_keyword_df(file_path=file_path, original_file_name=file_name, keywords=klaviyo_keywords, target_node_label="person_node")
-
-# %%
-marketing_campaign_df = pd.read_csv('data/klaviyo/all_sent_campaigns.csv')
-tagged_marketing_campaign_df = add_ingestion_tag_and_data_source_columns(df=marketing_campaign_df, tag="aug6_sep5", source="Klaviyo Analytics")
-tagged_marketing_campaign_df.to_csv('data/klaviyo/prepped_all_sent_campaigns.csv')
 
 # %%
 prep_edges_same_campaign_df(file_path=file_path, original_file_name=file_name, campaign_id='01J722YH98T4N9Y67S65HBDKGE', target_node_label="person_node")

@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 import threading
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Optional
 import pandas as pd
 from gremlin_python.process.graph_traversal import GraphTraversalSource, __  # noqa
 from gremlin_python.process.traversal import (  # noqa
@@ -35,10 +35,7 @@ class EdgeAdder:
         self.source_id_dict = self.create_id_dict(g, source_node, "uuid")
         self.target_id_dict = self.create_id_dict(g, target_node, "uuid")
 
-        # Print to verify mappings
-        # print("Source ID Dict:", self.source_id_dict)
-        # print("Target ID Dict:", self.target_id_dict)
-
+        # Lock for progress bar
         self.pbar_lock = threading.Lock()
 
     def create_id_dict(self, g, node_type, primary_property_label):
@@ -58,19 +55,27 @@ class EdgeAdder:
     def process_batch(self, batch, pbar, source_id_col, target_id_col):
         for _, row in batch.iterrows():
             source_graph_id = self.source_id_dict.get(row[source_id_col])
-            # Debug mismatched UUID values:
-            # print('source_graph_id: ', source_graph_id)
             target_values = row[target_id_col]
 
-            # If the target column contains multiple IDs (as a list), handle them
+            # Handle list or single string target values
             if isinstance(target_values, str):
-                target_values = [target_values]  # Convert single string to list for consistency
-
+                target_values = [target_values]
+            
             for target_value in target_values:
                 target_graph_id = self.target_id_dict.get(target_value)
-                # print("target_graph_id: ", target_graph_id)
                 if source_graph_id is not None and target_graph_id is not None:
-                    self.g.V(source_graph_id).addE(self.edge_label).to(__.V(target_graph_id)).iterate()
+                    edge = self.g.V(source_graph_id).addE(self.edge_label).to(__.V(target_graph_id))
+
+                    # Apply properties for this specific row
+                    properties = row["edge_properties"]
+                    if properties is not None and isinstance(properties, dict):
+                        for key, value in properties.items():
+                            if pd.notna(value):
+                                edge = edge.property(key, value)
+
+                    # Force edge creation and log it
+                    edge_created = edge.next()
+                    # print(f"Edge created: {edge_created}")
 
             # Safely update the progress bar
             with self.pbar_lock:

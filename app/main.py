@@ -41,9 +41,12 @@ async def app_startup():
     # print(marketing_campaigns_df)
     # add_marketing_campaigns(g, marketing_campaigns_df)
     
-    # person_df = pd.read_csv(f'{file_path}/keyword_added_person_node_{file_name}')
+    person_df = pd.read_csv(f'{file_path}/campaign_added_person_node_{file_name}')
+    # test_row = person_df.iloc[0:1]
+    # print(test_row)
     # print(person_df)
     # add_people(g, person_df)
+    # add_people(g, test_row)
 
     # unique_organizations_df = pd.read_csv(file_path + 'organization_list_' + file_name)
     # add_organizations(g, unique_organizations_df)
@@ -83,9 +86,9 @@ async def app_startup():
     # print(cleaned_keyword_person_df)
     # add_edges_person_keyword(g, cleaned_keyword_person_df)
 
-    # keyword_added_person_df = pd.read_csv(f'{file_path}keyword_added_person_node_{file_name}')
-    # print(keyword_added_person_df)
-    # add_edges_person_keyword_parallel(g, keyword_added_person_df)
+    add_edges_person_keyword(g, person_df)
+    # add_edges_person_keyword(g, test_row)
+    # add_edges_person_keyword_parallel(g, test_row)
 
     # cleaned_organization_person_df = pd.read_csv(file_path + 'cleaned_organization_' + file_name)
     # add_edges_person_organization(g, cleaned_organization_person_df)
@@ -132,7 +135,7 @@ async def app_startup():
     #     drop_edges, g, 'is_recipient_of'
     # )
     # await asyncio.to_thread(
-    #     drop_specific_node, g, 'person', 'ingestion_tag', 'klaviyo'
+    #     drop_specific_node, g, 'person', 'ingestion_tag', 'klaviyo_30YA_sep_promo'
     # )
     # await asyncio.to_thread(
     #     drop_specific_edge, g, 'interested_in', 'has_klaviyo_data', 'yes'
@@ -148,17 +151,17 @@ async def app_startup():
     # edge_count = await asyncio.to_thread(
     #     count_edges_in_db, g, 'interested_in'
     # )
-    edge_count = await asyncio.to_thread(
-        count_edges_in_db, g, 'is_recipient_of'
-    )
+    # edge_count = await asyncio.to_thread(
+    #     count_edges_in_db, g, 'is_recipient_of'
+    # )
 
-    # specific_node_count = count_specific_nodes_in_db(g, "person", "ingestion_tag", "klaviyo")
+    specific_node_count = count_specific_nodes_in_db(g, "person", "ingestion_tag", "klaviyo_30YA_sep_promo")
 
     # people_by_lead_scores_count = count_people_by_keyword(g, "Lead Scores")
 
-    # specific_edge_count = await asyncio.to_thread(
-    #     count_specific_edges_in_db, g, "interested_in", "has_klaviyo_data", "yes"
-    # )
+    specific_edge_count = await asyncio.to_thread(
+        count_specific_edges_in_db, g, "interested_in", "has_klaviyo_data", "yes"
+    )
     node_properties = await asyncio.to_thread(
         check_node_properties, g, 'person', 'email', '004953230@coyote.csusb.edu'
     )
@@ -168,9 +171,9 @@ async def app_startup():
     # node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'keyword', 'name', "Klaviyo"
     # )
-    marketing_campaign_node_properties = await asyncio.to_thread(
-        check_node_properties, g, 'marketing_campaign', 'uuid', '01J722YH98T4N9Y67S65HBDKGE'
-    )
+    # marketing_campaign_node_properties = await asyncio.to_thread(
+    #     check_node_properties, g, 'marketing_campaign', 'uuid', '01J722YH98T4N9Y67S65HBDKGE'
+    # )
     # publication_node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'publication', 'doi', '10.1038/s41589-024-01685-3'
     # )
@@ -179,10 +182,10 @@ async def app_startup():
     # )
     # print('QUERY RESULT:', query_result)
     # print('NODE COUNT:', node_count)
-    print('EDGE COUNT:', edge_count)
+    # print('EDGE COUNT:', edge_count)
     # print('LEAD SCORES PEOPLE COUNT:', people_by_lead_scores_count)
-    # print('SPECIFIC EDGE COUNT:', specific_edge_count)
-    # print('SPECIFIC NODE COUNT:', specific_node_count)
+    print('\nSPECIFIC EDGE COUNT:', specific_edge_count)
+    print('\nSPECIFIC NODE COUNT:', specific_node_count)
     # print('NAME LIST:', name_list)
     print('\nNODE PROPERTIES:', node_properties)
     # print('\nMARKETING CAMPAIGN NODE PROPERTIES:', marketing_campaign_node_properties)
