@@ -23,8 +23,9 @@ class Person:
         PURCHASING_AGENT = "purchasing_agent"
         VALIDATED_LEAD_STATUS = "validated_lead_status"
         STATUS = "status"  # LEAD-0, CUSTOMER-5, etc
-        INGESTION_TAG = "ingestion_tag"
-        DATA_SOURCE = "data_source"
+        INGESTION_TAG = "ingestion_tag" # "klaviyo" for all marketing campaign data
+        DATA_SOURCE = "data_source" # "Klaviyo Analytics" for all marketing campaign data
+        # for lead scoring data:
         NUMBER_OF_CASES = "number_of_cases"
         SCORE_CASE = "score_case"
         QUANTITY = "quantity"

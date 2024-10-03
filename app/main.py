@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
-from gremlin_queries import load_json_file, add_edges_person_marketing_campaign, add_edges_publication_keyword, add_edges_marketing_campaign_keyword, add_individual_keyword, add_marketing_campaigns, add_people, add_keywords, add_organizations, add_zymo_products, add_publications, add_publication_products, add_edges_publication_product, add_standardized_name, get_marketing_campaigns_by_keyword, get_publication_products_by_keyword, get_publications_by_keyword, get_organizations_by_keyword, get_publications_by_product, get_people_by_publication_product, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, count_people_by_keyword, drop_nodes, drop_edges, drop_specific_node, drop_specific_edge, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, count_specific_nodes_in_db, count_specific_edges_in_db, get_names, get_people_by_keyword
+from gremlin_queries import get_all_keywords, load_json_file, add_edges_person_marketing_campaign, add_edges_publication_keyword, add_edges_marketing_campaign_keyword, add_individual_keywords, add_marketing_campaigns, add_people, add_keywords, add_organizations, add_zymo_products, add_publications, add_publication_products, add_edges_publication_product, add_standardized_name, get_edge_properties_between_nodes, get_marketing_campaigns_by_keyword, get_publication_products_by_keyword, get_publications_by_keyword, get_organizations_by_keyword, get_publications_by_product, get_people_by_publication_product, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, count_people_by_keyword, drop_nodes, drop_edges, drop_specific_node, drop_specific_edge, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, count_specific_nodes_in_db, count_specific_edges_in_db, get_names, get_people_by_keyword
 import asyncio
 import database_connection
 import pandas as pd
@@ -34,8 +34,8 @@ async def app_startup():
     g = database_connection.get_gremlin_client()
     
     # NODE CREATION:
-    file_path = 'data/klaviyo'
-    file_name = 'recipients_30YA_sep_promo.csv'
+    file_path = 'data/klaviyo/directzol/directzol_RNA_NGS_US/'
+    file_name = 'deduped_recipients_directzol_RNA_NGS_US.csv'
 
     # marketing_campaigns_df = pd.read_csv('data/klaviyo/prepped_all_sent_campaigns.csv')
     # print(marketing_campaigns_df)
@@ -65,9 +65,8 @@ async def app_startup():
     # publication_products = load_json_file(file_path)
     # add_publication_products(g, publication_products)
 
-    # new_keywords = ["Klaviyo", "Emails", "Marketing", "Marketing Campaigns", "Email Marketing Data"]
-    # for keyword in new_keywords:
-    #     add_individual_keyword(g, keyword)
+    # new_keywords = ["96-well"]
+    # add_individual_keywords(g, new_keywords)
 
     # EDGE CREATION:
 
@@ -88,7 +87,7 @@ async def app_startup():
 
     # add_edges_person_keyword(g, person_df)
 
-    add_edges_person_marketing_campaign(g, person_df)
+    # add_edges_person_marketing_campaign(g, person_df)
 
     # cleaned_organization_person_df = pd.read_csv(file_path + 'cleaned_organization_' + file_name)
     # add_edges_person_organization(g, cleaned_organization_person_df)
@@ -115,6 +114,9 @@ async def app_startup():
     #     add_standardized_name, g
     # )
     # query_result = await asyncio.to_thread(
+    #     get_edge_properties_between_nodes, g, "57cb5764-8a48-49c6-9f4b-745d1e315221", "N5i3dM", "is_recipient_of"
+    # )
+    # query_result = await asyncio.to_thread(
     #     get_publications_by_product, g, "qiagen rneasy mini kit"
     # )
     # query_result = await asyncio.to_thread(
@@ -135,7 +137,7 @@ async def app_startup():
     #     drop_edges, g, 'is_recipient_of'
     # )
     # await asyncio.to_thread(
-    #     drop_specific_node, g, 'person', 'ingestion_tag', 'klaviyo_30YA_sep_promo'
+    #     drop_specific_node, g, 'person', 'ingestion_tag', 'klaviyo_directzol_PTGenetika_miRNA'
     # )
     # await asyncio.to_thread(
     #     drop_specific_edge, g, 'interested_in', 'has_klaviyo_data', 'yes'
@@ -151,25 +153,28 @@ async def app_startup():
     # edge_count = await asyncio.to_thread(
     #     count_edges_in_db, g, 'interested_in'
     # )
-    edge_count = await asyncio.to_thread(
-        count_edges_in_db, g, 'is_recipient_of'
-    )
+    # edge_count = await asyncio.to_thread(
+    #     count_edges_in_db, g, 'is_recipient_of'
+    # )
 
-    # specific_node_count = count_specific_nodes_in_db(g, "person", "ingestion_tag", "klaviyo_30YA_sep_promo")
+    specific_node_count = count_specific_nodes_in_db(g, "person", "ingestion_tag", "klaviyo_directzol_RNA_NGS_US")
 
     # people_by_lead_scores_count = count_people_by_keyword(g, "Lead Scores")
 
     # specific_edge_count = await asyncio.to_thread(
     #     count_specific_edges_in_db, g, "interested_in", "has_klaviyo_data", "yes"
     # )
+
+    all_keywords = get_all_keywords(g)
+
     node_properties = await asyncio.to_thread(
-        check_node_properties, g, 'person', 'email', '004953230@coyote.csusb.edu'
+        check_node_properties, g, 'person', 'email', 'alain.dabdoub@sri.utoronto.ca'
     )
     # node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'organization', 'display_name', 'SML Genetree Co. Ltd'
     # )
     # node_properties = await asyncio.to_thread(
-    #     check_node_properties, g, 'keyword', 'name', "Klaviyo"
+    #     check_node_properties, g, 'keyword', 'name', "miRNA"
     # )
     # marketing_campaign_node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'marketing_campaign', 'uuid', '01J722YH98T4N9Y67S65HBDKGE'
@@ -180,14 +185,15 @@ async def app_startup():
     # publication_product_node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'publication_product', 'name', 'qiagen rneasy mini kit'
     # )
-    # print('QUERY RESULT:', query_result)
+    print(all_keywords)
+    # print('\nQUERY RESULT:', query_result)
     # print('NODE COUNT:', node_count)
-    print('\nEDGE COUNT:', edge_count)
+    # print('\nEDGE COUNT:', edge_count)
     # print('LEAD SCORES PEOPLE COUNT:', people_by_lead_scores_count)
     # print('\nSPECIFIC EDGE COUNT:', specific_edge_count)
     # print('\nSPECIFIC NODE COUNT:', specific_node_count)
     # print('NAME LIST:', name_list)
-    print('\nNODE PROPERTIES:', node_properties)
+    # print('\nNODE PROPERTIES:', node_properties)
     # print('\nMARKETING CAMPAIGN NODE PROPERTIES:', marketing_campaign_node_properties)
     # print('NODE PROPERTIES:', publication_product_node_properties)
 

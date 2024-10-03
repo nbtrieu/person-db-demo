@@ -474,9 +474,9 @@ def add_edges_person_keyword(
 ):
     def get_edge_properties(row):
         properties = {}
-        if "lead_scoring" in row.get("Ingestion Tag", ""):
+        if "lead_scoring" in row.get("Node Ingestion Tag", ""):
             properties["has_lead_scores"] = "yes"
-        if "klaviyo" in row.get("Ingestion Tag", ""):
+        if "klaviyo" in row.get("Node Ingestion Tag", ""):
             properties["has_klaviyo_data"] = "yes"
         return properties
 
@@ -505,7 +505,9 @@ def add_edges_person_marketing_campaign(
         properties = {
             "opens": row["Opens"],
             "clicks": row["Clicks"],
-            "conversions": row["Conversions"]
+            "conversions": row["Conversions"],
+            "ingestion_tag": row["Edge Ingestion Tag"],
+            "data_source": row["Edge Data Source"]
         }
         return properties
 
@@ -572,27 +574,44 @@ def add_standardized_name(g: GraphTraversalSource):
     for entry in names_and_ids:
         g.V(entry["id"]).property("standardized_name", entry["name"].lower()).iterate()
 
-def add_individual_keyword(g: GraphTraversalSource, keyword: str):
+def add_individual_keywords(g: GraphTraversalSource, keywords: list):
     query_executor = BulkQueryExecutor(g, 100)
 
     current_time = datetime.now(timezone.utc).isoformat()
 
-    keyword_properties = {
-        Keyword.PropertyKey.UUID: keyword,
-        Keyword.PropertyKey.NAME: keyword,
-        Keyword.PropertyKey.CREATED_AT: current_time,
-        Keyword.PropertyKey.LAST_UPDATED_AT: current_time
-    }
+    for keyword in tqdm(keywords, total=len(keywords), desc="Importing new keywords"):
+        keyword_properties = {
+            Keyword.PropertyKey.UUID: keyword,
+            Keyword.PropertyKey.NAME: keyword,
+            Keyword.PropertyKey.CREATED_AT: current_time,
+            Keyword.PropertyKey.LAST_UPDATED_AT: current_time
+        }
 
-    query_executor.add_vertex(
-        label=Keyword.LABEL,
-        properties=keyword_properties
-    )
+        query_executor.add_vertex(
+            label=Keyword.LABEL,
+            properties=keyword_properties
+        )
 
     query_executor.force_execute()
 
 
 # %% QUERYING DATA:
+
+def get_edge_properties_between_nodes(
+    g: GraphTraversalSource,
+    source_uuid: str,
+    target_uuid: str,
+    edge_label: str
+):
+    edge_properties = (
+        g.V().has('uuid', source_uuid)
+        .outE(edge_label)
+        .where(__.inV().has('uuid', target_uuid))
+        .valueMap(True)
+        .next()
+    )
+    print(f"Edge properties between {source_uuid} and {target_uuid}: {edge_properties}")
+    return edge_properties
 
 #  SEARCH ALL NODES BY KEYWORD:
 def get_people_by_keyword(g: GraphTraversalSource, keyword: str):
@@ -757,7 +776,6 @@ property_label could be one of the following options:
     "event_name"
 '''
 
-
 # Search by UID for a unique person to get a specific property value:
 def get_unique_person_property(g: GraphTraversalSource, uuid_value: str, property_label: str):
     return (
@@ -767,6 +785,16 @@ def get_unique_person_property(g: GraphTraversalSource, uuid_value: str, propert
         .next()
     )
 
+
+# %%
+def get_all_keywords(g: GraphTraversalSource):
+    return (
+        g.V()
+        .hasLabel("keyword")
+        .valueMap()
+        .fold()
+        .toList()
+    )
 
 # %%
 # test_unique_person = get_unique_person_property(g, "craig.lower@truepill.com", "lead_source")

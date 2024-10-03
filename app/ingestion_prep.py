@@ -3,30 +3,20 @@ import pandas as pd
 import uuid
 import numpy as np
 import json
+from tqdm import tqdm
 
 # %%
-def remove_overlaps(table1_path: str, table2_path: str, new_table2_path: str):
-    # Load both CSVs
+def remove_overlaps(table1_path: str, table2_path: str, new_table2_path: str, duplicates_path: str):
     csv1 = pd.read_csv(table1_path)
     csv2 = pd.read_csv(table2_path)
-
-    # Find duplicate emails in both CSVs
     duplicate_emails = csv2[csv2['Email'].isin(csv1['Email'])]
-
-    # Print duplicate emails
     print("Duplicate Emails:")
     print(duplicate_emails)
-
-    # Remove duplicate emails from the second CSV
+    duplicate_emails.to_csv(duplicates_path, index=False)
     csv2_cleaned = csv2[~csv2['Email'].isin(csv1['Email'])]
-
-    # Dedupe second CSV
     csv2_deduped = csv2_cleaned.drop_duplicates()
-
-    # Save the cleaned second CSV to a new file
-    csv2_cleaned.to_csv(new_table2_path, index=False)
-
-    print("Successfully deduped table 2")
+    csv2_deduped.to_csv(new_table2_path, index=False)
+    print("Successfully deduped table 2 based on emails")
 
 
 def harmonize_column_titles(df: pd.DataFrame) -> pd.DataFrame:
@@ -183,9 +173,17 @@ def add_uuid_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def add_ingestion_tag_and_data_source_columns(df: pd.DataFrame, tag: str, source: str) -> pd.DataFrame:
-    df['Ingestion Tag'] = tag
-    df['Data Source'] = source
+def add_ingestion_tag_and_data_source_columns(
+    df: pd.DataFrame, 
+    node_tag: str, 
+    node_source: str,
+    edge_tag: str,
+    edge_source: str
+) -> pd.DataFrame:
+    df['Node Ingestion Tag'] = node_tag
+    df['Node Data Source'] = node_source
+    df['Edge Ingestion Tag'] = edge_tag
+    df['Edge Data Source'] = edge_source
     return df
 
 
@@ -215,11 +213,18 @@ def extract_unique_keywords(contact_df: pd.DataFrame):
     return unique_keywords_df
 
 
-def prep_person_df(file_path: str, file_name: str, tag: str, source: str):
+def prep_person_df(
+    file_path: str, 
+    file_name: str, 
+    node_tag: str, 
+    node_source: str,
+    edge_tag: str,
+    edge_source: str
+):
     person_df = pd.read_csv(f'{file_path}/{file_name}').drop_duplicates()
     person_df = harmonize_column_titles(person_df)
     person_df = add_uuid_column(person_df)
-    person_df = add_ingestion_tag_and_data_source_columns(person_df, tag, source)
+    person_df = add_ingestion_tag_and_data_source_columns(person_df, node_tag, node_source, edge_tag, edge_source)
     if "Full Name" not in person_df.columns:
         person_df["Full Name"] = person_df["First Name"] + " " + person_df["Last Name"]
     person_df.to_csv(f'{file_path}/prepped_{file_name}', index=False)
@@ -260,16 +265,85 @@ def prep_edges_same_keyword_df(file_path: str, original_file_name: str, keywords
     prepped_person_df.to_csv(f'{file_path}/keyword_added_{target_node_label}_{original_file_name}', index=False)
 
 def prep_edges_same_campaign_df(file_path: str, original_file_name: str, campaign_id: str, target_node_label: str): 
-    marketing_recipients_df = pd.read_csv(f'{file_path}/keyword_added_{target_node_label}_{file_name}')
+    marketing_recipients_df = pd.read_csv(f'{file_path}/keyword_added_{target_node_label}_{original_file_name}')
     marketing_recipients_df["Campaign ID"] = campaign_id
     marketing_recipients_df.to_csv(f'{file_path}/campaign_added_{target_node_label}_{original_file_name}', index=False)
 
 # %%
-file_path = 'data/klaviyo'
-file_name = 'recipients_30YA_sep_promo.csv'
+current_file_name = 'recipients_directzol_RNA_NGS_US'
+current_file_directory = 'directzol_RNA_NGS_US'
+previous_table_path = 'data/klaviyo/directzol/directzol_miRNA/recipients_directzol_miRNA.csv'
+current_table_path = f'data/klaviyo/directzol/{current_file_directory}/{current_file_name}.csv'
+new_current_table_path = f'data/klaviyo/directzol/{current_file_directory}/deduped_{current_file_name}.csv'
+duplicates_path = f'data/klaviyo/directzol/{current_file_directory}/duplicates_{current_file_name}.csv'
+
+remove_overlaps(previous_table_path, current_table_path, new_current_table_path, duplicates_path)
 
 # %%
-prep_person_df(file_path=file_path, file_name=file_name, tag="klaviyo_30YA_sep_promo", source="Klaviyo Recipients 30YA September Promo")
+file_path = 'data/klaviyo/directzol/directzol_RNA_NGS_INTL/'
+file_name = 'recipients_directzol_RNA_NGS_INTL.csv'
+
+# %%
+prep_person_df(
+    file_path=file_path, 
+    file_name=file_name, 
+    node_tag="klaviyo", 
+    node_source="Klaviyo Analytics",
+    edge_tag="klaviyo_directzol_RNA_NGS_INTL",
+    edge_source="Klaviyo Direct-zol RNA - NGS- INTL"
+)
+
+# %%
+klaviyo_keywords = ["Klaviyo", "Emails", "Marketing", "Marketing Campaigns", "Email Marketing Data", "Direct-zol", "RNA", "NGS", "International"]
+prep_edges_same_keyword_df(file_path=file_path, original_file_name=file_name, keywords=klaviyo_keywords, target_node_label="person_node")
+
+# %%
+prep_edges_same_campaign_df(file_path=file_path, original_file_name=file_name, campaign_id='JBEpX8', target_node_label="person_node")
+
+# %% PREP DIRECTZOL CAMPAIGNS WITH COMMON STRING VALUES:
+directzol_campaigns_df = pd.read_csv('data/klaviyo/directzol/directzol_campaigns.csv')
+directzol_campaigns_df["Directory Name"] = "directzol_"
+directzol_campaigns_df["Keywords"] = "Klaviyo, Emails, Marketing, Marketing Campaigns, Email Marketing Data, Direct-zol, "
+directzol_campaigns_df.to_csv('data/klaviyo/directzol/prepped_directzol_campaigns.csv')
+
+# %% TO DO: modify this to loop over the prepped directzol campaign DF:
+def prep_each_directzol_campaign_df(dir_name: str, campaign_name: str, keywords: list, campaign_id: str):
+    file_path=f'data/klaviyo/directzol/{dir_name}'
+    file_name=f'recipients_{dir_name}.csv' 
+    
+    prep_person_df(
+        file_path=file_path, 
+        file_name=file_name, 
+        node_tag="klaviyo", 
+        node_source="Klaviyo Analytics",
+        edge_tag=f"klaviyo_{dir_name}",
+        edge_source=f"Klaviyo {campaign_name}"
+    )
+    prep_edges_same_keyword_df(file_path=file_path, original_file_name=file_name, keywords=keywords, target_node_label="person_node")
+    prep_edges_same_campaign_df(file_path=file_path, original_file_name=file_name, campaign_id=campaign_id, target_node_label="person_node")
+
+# %%
+prepped_directzol_campaigns = pd.read_csv('data/klaviyo/directzol/prepped_directzol_campaigns.csv')
+for _, row in tqdm(
+    prepped_directzol_campaigns.iterrows(),
+    total=prepped_directzol_campaigns.shape[0],
+    desc="Preparing each directzol campaign"
+):
+    prep_each_directzol_campaign_df(
+        dir_name=row.get("Directory Name"),
+        campaign_name=row.get("Campaign Name"),
+        keywords=row.get("Keywords"),
+        campaign_id=row.get("Campaign ID")
+    )
+
+# %%
+klaviyo_keywords = ["Klaviyo", "Emails", "Marketing", "Marketing Campaigns", "Email Marketing Data", "Direct-zol", "RNA", "NGS", "International"]
+prep_each_directzol_campaign_df(
+    dir_name="directzol_RNA_NGS_INTL",
+    campaign_name="Direct-zol RNA - NGS- INTL",
+    keywords=klaviyo_keywords,
+    campaign_id="JBEpX8"
+)
 
 # %%
 prep_organization_df(file_path=file_path, file_name=file_name)
@@ -283,19 +357,18 @@ prep_edges_df(file_path=file_path, file_name=file_name, column_name="Organizatio
 # %%
 prep_edges_df(file_path=file_path, file_name=file_name, column_name="Keywords", target_node_label="keyword")
 
-# %%
-klaviyo_keywords = ["Klaviyo", "Emails", "Marketing", "Marketing Campaigns", "Email Marketing Data"]
-prep_edges_same_keyword_df(file_path=file_path, original_file_name=file_name, keywords=klaviyo_keywords, target_node_label="person_node")
+# %% Filter for campaigns related to Direct-zol
+marketing_campaigns_df = pd.read_csv('data/klaviyo/all_sent_campaigns.csv')
+filtered_marketing_campaigns_df = marketing_campaigns_df[marketing_campaigns_df["Campaign Name"].str.contains("Direct-zol", case=False, na=False)]
+filtered_marketing_campaigns_df.to_csv('data/klaviyo/directzol_campaigns.csv')
 
 # %%
-prep_edges_same_campaign_df(file_path=file_path, original_file_name=file_name, campaign_id='01J722YH98T4N9Y67S65HBDKGE', target_node_label="person_node")
-
-# %%
-# table1_path = 'data/qiagen_rneasy.csv'
-# table2_path = 'data/2019-2023_Leads_List_Test_deduped.csv'
-# new_table2_path = 'data/updated_2019-23_leads.csv'
-
-# remove_overlaps(table1_path, table2_path, new_table2_path)
+original_df = pd.read_csv('data/2019-23_scileads/2019-2023_Leads_List_Test_deduped.csv')
+filtered_df = original_df[
+    original_df["Email"].str.contains("USDA", case=False, na=False) |
+    original_df["Organization"].str.contains("USDA", case=False, na=False)
+]
+filtered_df.to_csv('data/2019-23_scileads/2019-23_usda_leads.csv', index=False)
 
 # # %%
 # qiagen_df = pd.read_csv('data/qiagen_rneasy.csv')
@@ -314,6 +387,12 @@ prep_edges_same_campaign_df(file_path=file_path, original_file_name=file_name, c
 # print(leads1923_df)
 # leads1923_df.to_csv('data/updated_2019-2023_Leads_List_Test_deduped.csv', index=False
 #                     )
+
+# %%
+microbiomics_products_df = pd.read_csv('data/netsuite_products/microbiomics_products.csv')
+skus_list = microbiomics_products_df['Item name/SKU#'].tolist()
+skus_string = ', '.join(skus_list)
+print(skus_string)
 
 # %% ZYMO PRODUCT INGESTION
 # Load the CSV files into DataFrames
@@ -373,5 +452,27 @@ for article in article_metadata:
     if keywords not in article_keywords:
         article_keywords.append(keywords)
 print(article_keywords)
+
+# %% MICROBIOMICS CUSTOMERS
+microbiomics_customers_df = pd.read_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/shopify/microbiomics_orders.csv')
+columns_to_keep = ['ID', 'Name', 'Number', 'Phone', 'Email', 'Created At', 'Updated At', 'Processed At', 'Closed At', 
+                   'Source', 'Customer: ID', 'Customer: Email', 'Customer: Phone', 'Customer: First Name', 
+                   'Customer: Last Name', 'Customer: Tags', 'Customer: Email Marketing Status', 
+                   'Customer: SMS Marketing Status', 'Customer: Tax Exempt', 'Customer: Orders Count', 
+                   'Customer: Total Spent', 'Billing: First Name', 'Billing: Last Name', 'Billing: Name', 
+                   'Billing: Company', 'Billing: Phone', 'Billing: Address 1', 'Billing: Address 2', 
+                   'Billing: Zip', 'Billing: City', 'Billing: Province', 'Billing: Province Code', 
+                   'Billing: Country', 'Billing: Country Code', 'Shipping: First Name', 'Shipping: Last Name', 
+                   'Shipping: Name', 'Shipping: Company', 'Shipping: Phone', 'Shipping: Address 1', 
+                   'Shipping: Address 2', 'Shipping: Zip', 'Shipping: City', 'Shipping: Province', 
+                   'Shipping: Province Code', 'Shipping: Country', 'Shipping: Country Code', 'Line: Title', 
+                   'Line: Name', 'Line: Variant Title', 'Line: SKU', 'Line: Quantity', 'Line: Price', 
+                   'Line: Discount', 'Line: Discount Allocation', 'Line: Discount per Item', 'Line: Total', 
+                   'Line: Vendor']
+df_filtered = microbiomics_customers_df[columns_to_keep]
+df_sorted = df_filtered.sort_values(by='Customer: Orders Count', ascending=False)
+df_deduped = df_sorted.drop_duplicates(subset=['Customer: First Name', 'Customer: Last Name'], keep='first')
+print(df_deduped)
+df_deduped.to_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/shopify/microbiomics_customers.csv')
 
 # %%
