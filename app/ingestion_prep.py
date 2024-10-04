@@ -4,6 +4,7 @@ import uuid
 import numpy as np
 import json
 from tqdm import tqdm
+import os
 
 # %%
 def remove_overlaps(table1_path: str, table2_path: str, new_table2_path: str, duplicates_path: str):
@@ -336,14 +337,25 @@ for _, row in tqdm(
         campaign_id=row.get("Campaign ID")
     )
 
-# %%
-klaviyo_keywords = ["Klaviyo", "Emails", "Marketing", "Marketing Campaigns", "Email Marketing Data", "Direct-zol", "RNA", "NGS", "International"]
-prep_each_directzol_campaign_df(
-    dir_name="directzol_RNA_NGS_INTL",
-    campaign_name="Direct-zol RNA - NGS- INTL",
-    keywords=klaviyo_keywords,
-    campaign_id="JBEpX8"
-)
+# %% 
+campaign_reference_df = pd.read_csv('data/klaviyo/directzol/prepped_directzol_campaigns.csv')
+base_dir = 'data/klaviyo/directzol'
+all_dataframes = []
+
+for directory in campaign_reference_df['Directory Name']:
+    file_path = os.path.join(base_dir, directory, f'campaign_added_person_node_recipients_{directory}.csv')
+    
+    if os.path.exists(file_path):
+        df = pd.read_csv(file_path)
+        all_dataframes.append(df)
+    else:
+        print(f"File not found: {file_path}")
+
+combined_df = pd.concat(all_dataframes, ignore_index=True)
+combined_df.to_csv('data/klaviyo/directzol/combined_processed_directzol_campaigns.csv', index=False)
+
+print("All campaign files combined and saved successfully.")
+
 
 # %%
 prep_organization_df(file_path=file_path, file_name=file_name)
@@ -453,8 +465,9 @@ for article in article_metadata:
         article_keywords.append(keywords)
 print(article_keywords)
 
-# %% MICROBIOMICS CUSTOMERS
-microbiomics_customers_df = pd.read_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/shopify/microbiomics_orders.csv')
+
+# %% PROCESS MICROBIOMICS SHOPIFY CUSTOMERS
+shopify_microbiomics_customers_df = pd.read_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/shopify/microbiomics_orders.csv')
 columns_to_keep = ['ID', 'Name', 'Number', 'Phone', 'Email', 'Created At', 'Updated At', 'Processed At', 'Closed At', 
                    'Source', 'Customer: ID', 'Customer: Email', 'Customer: Phone', 'Customer: First Name', 
                    'Customer: Last Name', 'Customer: Tags', 'Customer: Email Marketing Status', 
@@ -469,10 +482,50 @@ columns_to_keep = ['ID', 'Name', 'Number', 'Phone', 'Email', 'Created At', 'Upda
                    'Line: Name', 'Line: Variant Title', 'Line: SKU', 'Line: Quantity', 'Line: Price', 
                    'Line: Discount', 'Line: Discount Allocation', 'Line: Discount per Item', 'Line: Total', 
                    'Line: Vendor']
-df_filtered = microbiomics_customers_df[columns_to_keep]
+df_filtered = shopify_microbiomics_customers_df[columns_to_keep]
 df_sorted = df_filtered.sort_values(by='Customer: Orders Count', ascending=False)
 df_deduped = df_sorted.drop_duplicates(subset=['Customer: First Name', 'Customer: Last Name'], keep='first')
 print(df_deduped)
 df_deduped.to_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/shopify/microbiomics_customers.csv')
+
+# %% PROCESS MICROBIOMICS NETSUITE CUSTOMERS
+netsuite_microbiomics_customers_df = pd.read_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/netsuite-data/Purchased Microbiomics.csv')
+split_cols = netsuite_microbiomics_customers_df['Name'].str.split(' : ', n=1, expand=True)
+split_cols.columns = ['Organization', 'Customer: Full Name']
+split_cols['Customer: Full Name'].fillna('Unknown Name', inplace=True)
+netsuite_microbiomics_customers_df[['Organization', 'Customer: Full Name']] = split_cols
+name_split = netsuite_microbiomics_customers_df['Customer: Full Name'].str.split(' ', n=1, expand=True)
+netsuite_microbiomics_customers_df['Customer: First Name'] = name_split[0].fillna('')  # Fill with empty string if no first name
+netsuite_microbiomics_customers_df['Customer: Last Name'] = name_split[1].fillna('')
+netsuite_microbiomics_customers_df.to_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/netsuite-data/netsuite_microbiomics_customers.csv', index=False)
+
+# %% ANALYZE NETSUITE VS. SHOPIFY MICROBIOMICS CUSTOMERS
+netsuite_microbiomics_customers_path = '/Users/nicoletrieu/Documents/zymo/business-intelligence/netsuite-data/netsuite_microbiomics_customers.csv'
+shopify_microbiomics_customers_path = '/Users/nicoletrieu/Documents/zymo/business-intelligence/shopify/microbiomics_customers.csv'
+
+netsuite_microbiomics_customers_df = pd.read_csv(netsuite_microbiomics_customers_path)
+shopify_microbiomics_customers_df = pd.read_csv(shopify_microbiomics_customers_path)
+
+email_column_netsuite = 'Email'
+email_column_shopify = 'Customer: Email'
+
+overlap_df = pd.merge(netsuite_microbiomics_customers_df, shopify_microbiomics_customers_df, on=email_column_netsuite, how='inner')
+
+unique_netsuite_df = netsuite_microbiomics_customers_df[~netsuite_microbiomics_customers_df[email_column_netsuite].isin(overlap_df[email_column_netsuite])]
+unique_shopify_df = shopify_microbiomics_customers_df[~shopify_microbiomics_customers_df[email_column_shopify].isin(overlap_df[email_column_netsuite])]
+
+overlap_df.to_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/microbiomics-customers/overlapping_emails.csv', index=False)
+unique_netsuite_df.to_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/microbiomics-customers/unique_netsuite_microbiomics_customers_email.csv', index=False)
+unique_shopify_df.to_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/microbiomics-customers/unique_shopify_microbiomics_customers_email.csv', index=False)
+
+# %% COMBINE AND DEDUPLICATE NETSUITE AND SHOPIFY MICROBIOMICS CUSTOMERS
+netsuite_microbiomics_customers_df = pd.read_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/netsuite-data/netsuite_microbiomics_customers.csv')
+microbiomics_customers_df = pd.read_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/shopify/microbiomics_customers.csv')
+
+combined_df = pd.concat([netsuite_microbiomics_customers_df, microbiomics_customers_df], ignore_index=True, sort=False)
+
+deduplicated_df = combined_df.drop_duplicates(subset=['Email', 'Customer: First Name', 'Customer: Last Name'])
+
+deduplicated_df.to_csv('data/combined_deduplicated_microbiomics_customers.csv', index=False)
 
 # %%
