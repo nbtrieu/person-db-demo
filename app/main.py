@@ -34,14 +34,14 @@ async def app_startup():
     g = database_connection.get_gremlin_client()
     
     # NODE CREATION:
-    file_path = 'data/klaviyo/directzol/directzol_RNA_NGS_US/'
-    file_name = 'deduped_recipients_directzol_RNA_NGS_US.csv'
+    file_path = 'data/klaviyo/directzol/'
+    file_name = 'unique_person_nodes.csv'
 
     # marketing_campaigns_df = pd.read_csv('data/klaviyo/prepped_all_sent_campaigns.csv')
     # print(marketing_campaigns_df)
     # add_marketing_campaigns(g, marketing_campaigns_df)
     
-    person_df = pd.read_csv(f'{file_path}/campaign_added_person_node_{file_name}')
+    person_df = pd.read_csv(f'{file_path}{file_name}')
     # test_row = person_df.iloc[0:1]
     # print(test_row)
     # print(person_df)
@@ -113,9 +113,9 @@ async def app_startup():
     # function_result = await asyncio.to_thread(
     #     add_standardized_name, g
     # )
-    # query_result = await asyncio.to_thread(
-    #     get_edge_properties_between_nodes, g, "57cb5764-8a48-49c6-9f4b-745d1e315221", "N5i3dM", "is_recipient_of"
-    # )
+    query_result = await asyncio.to_thread(
+        get_edge_properties_between_nodes, g, "0779772c-2e59-4010-8dd3-3285eedcc4b7", "01HA2M110J99PNNQS2PWAFXRG5", "is_recipient_of"
+    )
     # query_result = await asyncio.to_thread(
     #     get_publications_by_product, g, "qiagen rneasy mini kit"
     # )
@@ -157,7 +157,7 @@ async def app_startup():
     #     count_edges_in_db, g, 'is_recipient_of'
     # )
 
-    specific_node_count = count_specific_nodes_in_db(g, "person", "ingestion_tag", "klaviyo_directzol_RNA_NGS_US")
+    specific_node_count = count_specific_nodes_in_db(g, "person", "ingestion_tag", "directzol_PTGenetika_RPLeffect")
 
     # people_by_lead_scores_count = count_people_by_keyword(g, "Lead Scores")
 
@@ -165,10 +165,10 @@ async def app_startup():
     #     count_specific_edges_in_db, g, "interested_in", "has_klaviyo_data", "yes"
     # )
 
-    all_keywords = get_all_keywords(g)
+    # all_keywords = get_all_keywords(g)
 
     node_properties = await asyncio.to_thread(
-        check_node_properties, g, 'person', 'email', 'alain.dabdoub@sri.utoronto.ca'
+        check_node_properties, g, 'person', 'email', 'z.z@duke.edu'
     )
     # node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'organization', 'display_name', 'SML Genetree Co. Ltd'
@@ -185,8 +185,8 @@ async def app_startup():
     # publication_product_node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'publication_product', 'name', 'qiagen rneasy mini kit'
     # )
-    print(all_keywords)
-    # print('\nQUERY RESULT:', query_result)
+    # print(all_keywords)
+    print('\nQUERY RESULT:', query_result)
     # print('NODE COUNT:', node_count)
     # print('\nEDGE COUNT:', edge_count)
     # print('LEAD SCORES PEOPLE COUNT:', people_by_lead_scores_count)

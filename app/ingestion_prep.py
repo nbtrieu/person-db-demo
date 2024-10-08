@@ -281,11 +281,36 @@ duplicates_path = f'data/klaviyo/directzol/{current_file_directory}/duplicates_{
 remove_overlaps(previous_table_path, current_table_path, new_current_table_path, duplicates_path)
 
 # %%
+def prep_directzol_person_df(
+    file_path: str, 
+    file_name: str, 
+    node_tag: str, 
+    node_source: str,
+    edge_tag: str,
+    edge_source: str,
+    keywords: str
+):
+    person_df = pd.read_csv(f'{file_path}/{file_name}').drop_duplicates()
+    person_df = harmonize_column_titles(person_df)
+    person_df = add_uuid_column(person_df)
+    person_df = add_ingestion_tag_and_data_source_columns(person_df, node_tag, node_source, edge_tag, edge_source)
+    if "Full Name" not in person_df.columns:
+        person_df["Full Name"] = person_df["First Name"] + " " + person_df["Last Name"]
+    person_df["Keywords"] = keywords
+    person_df.to_csv(f'{file_path}/prepped_{file_name}', index=False)
+
+def prep_directzol_person_same_campaign_edges_df(file_path: str, original_file_name: str, campaign_id: str, target_node_label: str): 
+    marketing_recipients_df = pd.read_csv(f'{file_path}/prepped_{original_file_name}')
+    marketing_recipients_df["Campaign ID"] = campaign_id
+    marketing_recipients_df.to_csv(f'{file_path}/campaign_added_{target_node_label}_{original_file_name}', index=False)
+
+
+# %%
 file_path = 'data/klaviyo/directzol/directzol_RNA_NGS_INTL/'
 file_name = 'recipients_directzol_RNA_NGS_INTL.csv'
 
 # %%
-prep_person_df(
+prep_directzol_person_df(
     file_path=file_path, 
     file_name=file_name, 
     node_tag="klaviyo", 
@@ -307,21 +332,21 @@ directzol_campaigns_df["Directory Name"] = "directzol_"
 directzol_campaigns_df["Keywords"] = "Klaviyo, Emails, Marketing, Marketing Campaigns, Email Marketing Data, Direct-zol, "
 directzol_campaigns_df.to_csv('data/klaviyo/directzol/prepped_directzol_campaigns.csv')
 
-# %% TO DO: modify this to loop over the prepped directzol campaign DF:
-def prep_each_directzol_campaign_df(dir_name: str, campaign_name: str, keywords: list, campaign_id: str):
+# %%
+def prep_each_directzol_campaign_df(dir_name: str, campaign_name: str, keywords: str, campaign_id: str):
     file_path=f'data/klaviyo/directzol/{dir_name}'
     file_name=f'recipients_{dir_name}.csv' 
     
-    prep_person_df(
+    prep_directzol_person_df(
         file_path=file_path, 
         file_name=file_name, 
-        node_tag="klaviyo", 
+        node_tag="klaviyo_directzol", 
         node_source="Klaviyo Analytics",
         edge_tag=f"klaviyo_{dir_name}",
-        edge_source=f"Klaviyo {campaign_name}"
+        edge_source=f"Klaviyo {campaign_name}",
+        keywords=keywords
     )
-    prep_edges_same_keyword_df(file_path=file_path, original_file_name=file_name, keywords=keywords, target_node_label="person_node")
-    prep_edges_same_campaign_df(file_path=file_path, original_file_name=file_name, campaign_id=campaign_id, target_node_label="person_node")
+    prep_directzol_person_same_campaign_edges_df(file_path=file_path, original_file_name=file_name, campaign_id=campaign_id, target_node_label="person_node")
 
 # %%
 prepped_directzol_campaigns = pd.read_csv('data/klaviyo/directzol/prepped_directzol_campaigns.csv')
@@ -356,6 +381,13 @@ combined_df.to_csv('data/klaviyo/directzol/combined_processed_directzol_campaign
 
 print("All campaign files combined and saved successfully.")
 
+# %%
+combined_df = pd.read_csv('data/klaviyo/directzol/combined_processed_directzol_campaigns.csv')
+unique_df = combined_df.drop_duplicates(subset='Email', keep='first')
+duplicate_df = combined_df[combined_df.duplicated(subset='Email', keep=False)]
+unique_df.to_csv('data/klaviyo/directzol/unique_person_nodes.csv', index=False)
+duplicate_df.to_csv('data/klaviyo/directzol/duplicate_person_edges.csv', index=False)
+print("Unique and duplicate data saved successfully.")
 
 # %%
 prep_organization_df(file_path=file_path, file_name=file_name)
