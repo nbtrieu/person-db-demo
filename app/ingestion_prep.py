@@ -438,28 +438,65 @@ skus_list = microbiomics_products_df['Item name/SKU#'].tolist()
 skus_string = ', '.join(skus_list)
 print(skus_string)
 
-# %% ZYMO PRODUCT INGESTION
-# Load the CSV files into DataFrames
-table1 = pd.read_csv('data/netsuite_products.csv')
-table2 = pd.read_csv('data/product_enrichment.csv')
+# %% ZYMO NETSUITE PRODUCT INGESTION
+table1 = pd.read_csv('data/netsuite_products/netsuite_products.csv')
+table2 = pd.read_csv('data/netsuite_products/product_enrichment.csv')
+
+table1.rename(columns={'Item name/SKU#': 'SKU#', 'Description': 'Item Name'}, inplace=True)
 
 # Select specific columns from netsuite_products table
-table1 = table1[['Item name/SKU#', 'Product Category', 'Class (no hierarchy)', 'Type', 'Base Price', 'Inactive', 'Shelf Life (Months)', 'Storage Temperature', 'Shipping Temperature', 'Length', 'Width', 'Height', 'Weight', 'Available']]
+table1 = table1[['SKU#', 'Item Name', 'Product Category', 'Class (no hierarchy)', 'Type', 'Base Price', 'Inactive', 'Shelf Life (Months)', 'Storage Temperature', 'Shipping Temperature', 'Length', 'Width', 'Height', 'Weight', 'Available']]
 
-# Merge the "Highlight A", "Highlight B", and "Highlight C" columns into one "Features" column
 table2['Features'] = table2[['Highlight A', 'Highlight B', 'Highlight C']].apply(lambda x: ' '.join(x.dropna()), axis=1)
 
 # Select specific columns from product_enrichment table
-table2 = table2[['Catalog Number', 'Description', 'Short Description', 'Features', 'Safety Data Sheet/ MSDS URL', 'Product URL', 'Link for Main image of item']]
+table2 = table2[['Catalog Number', 'Description', 'Short Description', 'Features', 'Safety Data Sheet/ MSDS URL', 'Product URL', 'Link for Main image of item', 'Product URL', 'Country of Origin', 'Manufacturer', 'Size', 'Unit Standard', 'Item Volume', 'Volume Units']]
 
-# Merge the DataFrames on the matching columns
-merged_table = pd.merge(table1, table2, left_on='Item name/SKU#', right_on='Catalog Number', how='left')
+merged_table = pd.merge(table1, table2, left_on='SKU#', right_on='Catalog Number', how='left')
 
-# Drop the redundant 'Catalog Number' column from the merged DataFrame
 merged_table = merged_table.drop(columns=['Catalog Number'])
 
-# Save the merged table to a new CSV file
-merged_table.to_csv('data/merged_netsuite_products.csv', index=False)
+merged_table.to_csv('data/netsuite_products/merged_netsuite_products.csv', index=False)
+
+# %% ZYMO WEB PRODUCT INGESTION
+web_products_df = pd.read_csv('data/shopify/web_products/shopify_products_with_metafields_inactive_included.csv', low_memory=False)
+web_products_df = web_products_df.dropna(axis=1, how='all')
+web_products_df.to_csv('data/shopify/web_products/cleaned_shopify_products_with_metafields_inactive_included.csv', index=False)
+
+# %%
+cleaned_web_products_df = pd.read_csv('data/shopify/web_products/cleaned_shopify_products_with_metafields_inactive_included.csv', low_memory=False)
+threshold = len(cleaned_web_products_df) * .8
+filtered_cleaned_web_products_df = cleaned_web_products_df[
+    [col for col in cleaned_web_products_df.columns
+     if not col.startswith('Metafield: ') or cleaned_web_products_df[col].isna().sum() < threshold]
+]
+filtered_cleaned_web_products_df.to_csv('data/shopify/web_products/filtered_cleaned_shopify_products_with_metafields_inactive_included.csv', index=False)
+
+# %%
+filtered_cleaned_web_products_df = pd.read_csv('data/shopify/web_products/filtered_cleaned_shopify_products_with_metafields_inactive_included.csv', low_memory=False)
+# convert large numerical IDs to strings to prevent overflow issues:
+filtered_cleaned_web_products_df['Shopify ID'] = filtered_cleaned_web_products_df['Shopify ID'].astype(str)
+filtered_cleaned_web_products_df['Variant ID'] = filtered_cleaned_web_products_df['Variant ID'].astype(str)
+filtered_cleaned_web_products_df.to_csv('data/shopify/web_products/finalized_web_products.csv', index=False)
+
+# %%
+finalized_web_products_df = pd.read_csv('data/shopify/web_products/finalized_web_products.csv', low_memory=False)
+print(finalized_web_products_df[['Shopify ID', 'Variant ID', 'Total Inventory Qty']].max())
+print(finalized_web_products_df[['Shopify ID', 'Variant ID']].dtypes)
+
+# %%
+finalized_web_products_df = pd.read_csv('data/shopify/web_products/finalized_web_products.csv', low_memory=False)
+min_non_na_columns = int(0.005 * len(finalized_web_products_df))
+sample_df = finalized_web_products_df.dropna(thresh=min_non_na_columns).head(10)
+print(sample_df)
+sample_df.to_csv('data/shopify/web_products/sample_filled_rows.csv', index=False)
+
+# %%
+filtered_cleaned_web_products_df = pd.read_csv('data/shopify/web_products/filtered_cleaned_shopify_products_with_metafields_inactive_included.csv', low_memory=False)
+# print(filtered_cleaned_web_products_df[['Shopify_ID', 'Variant ID', 'Total Inventory Qty']].max())
+filtered_cleaned_web_products_df['Shopify_ID'] = filtered_cleaned_web_products_df['Shopify_ID'].astype(str)
+filtered_cleaned_web_products_df['Variant ID'] = filtered_cleaned_web_products_df['Variant ID'].astype(str)
+filtered_cleaned_web_products_df.to_csv('data/shopify/web_products/sample_filled_rows.csv', index=False)
 
 # %% PUBLICATION PRODUCT INGESTION
 def generate_uuid():
@@ -498,7 +535,7 @@ for article in article_metadata:
 print(article_keywords)
 
 
-# %% PROCESS MICROBIOMICS SHOPIFY CUSTOMERS
+# %% PROCESS MICROBIOMICS SHOPIFY DATA
 shopify_microbiomics_customers_df = pd.read_csv('/Users/nicoletrieu/Documents/zymo/business-intelligence/shopify/microbiomics_orders.csv')
 columns_to_keep = ['ID', 'Name', 'Number', 'Phone', 'Email', 'Created At', 'Updated At', 'Processed At', 'Closed At', 
                    'Source', 'Customer: ID', 'Customer: Email', 'Customer: Phone', 'Customer: First Name', 

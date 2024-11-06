@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 # from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
-from gremlin_queries import get_all_keywords, load_json_file, add_edges_person_marketing_campaign, add_edges_publication_keyword, add_edges_marketing_campaign_keyword, add_individual_keywords, add_marketing_campaigns, add_people, add_keywords, add_organizations, add_zymo_products, add_publications, add_publication_products, add_edges_publication_product, add_standardized_name, get_edge_properties_between_nodes, get_marketing_campaigns_by_keyword, get_publication_products_by_keyword, get_publications_by_keyword, get_organizations_by_keyword, get_publications_by_product, get_people_by_publication_product, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, count_people_by_keyword, drop_nodes, drop_edges, drop_specific_node, drop_specific_edge, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, count_specific_nodes_in_db, count_specific_edges_in_db, get_names, get_people_by_keyword
+from gremlin_queries import add_cohort_users, get_all_keywords, get_all_zymo_web_products, load_json_file, add_edges_person_marketing_campaign, add_edges_publication_keyword, add_edges_marketing_campaign_keyword, add_individual_keywords, add_marketing_campaigns, add_people, add_keywords, add_organizations, add_zymo_netsuite_products, add_zymo_web_products, add_publications, add_publication_products, add_edges_publication_product, add_standardized_name, get_edge_properties_between_nodes, get_marketing_campaigns_by_keyword, get_publication_products_by_keyword, get_publications_by_keyword, get_organizations_by_keyword, get_publications_by_product, get_people_by_publication_product, get_people_from_organization, get_people_by_full_name, count_nodes_in_db, count_people_by_keyword, drop_nodes, drop_edges, drop_specific_node, drop_specific_edge, check_node_properties, add_edges_person_keyword, add_edges_person_organization, count_edges_in_db, count_specific_nodes_in_db, count_specific_edges_in_db, get_names, get_people_by_keyword
 import asyncio
 import database_connection
 import pandas as pd
@@ -34,14 +34,15 @@ async def app_startup():
     g = database_connection.get_gremlin_client()
     
     # NODE CREATION:
-    file_path = 'data/klaviyo/directzol/'
-    file_name = 'unique_person_nodes.csv'
+    # add_cohort_users(g)
+    # file_path = 'data/shopify/web_products'
+    # file_name = 'sample_filled_rows.csv'
 
     # marketing_campaigns_df = pd.read_csv('data/klaviyo/prepped_all_sent_campaigns.csv')
     # print(marketing_campaigns_df)
     # add_marketing_campaigns(g, marketing_campaigns_df)
     
-    person_df = pd.read_csv(f'{file_path}{file_name}')
+    # person_df = pd.read_csv(f'{file_path}{file_name}')
     # test_row = person_df.iloc[0:1]
     # print(test_row)
     # print(person_df)
@@ -54,8 +55,11 @@ async def app_startup():
     # unique_keywords_df = pd.read_csv(file_path + 'keyword_list_' + file_name)
     # add_keywords(g, unique_keywords_df)
 
-    # zymo_products_df = pd.read_csv(file_path + 'merged_netsuite_products.csv')
+    # zymo_products_df = pd.read_csv(file_path + file_name)
     # add_products(g, zymo_products_df)
+
+    # zymo_web_products_df = pd.read_csv(f'{file_path}/{file_name}')
+    # add_zymo_web_products(g, zymo_web_products_df)
 
     # file_path = 'data/alps_scraping/article_metadata.json'
     # publications = load_json_file(file_path)
@@ -113,9 +117,12 @@ async def app_startup():
     # function_result = await asyncio.to_thread(
     #     add_standardized_name, g
     # )
-    query_result = await asyncio.to_thread(
-        get_edge_properties_between_nodes, g, "0779772c-2e59-4010-8dd3-3285eedcc4b7", "01HA2M110J99PNNQS2PWAFXRG5", "is_recipient_of"
-    )
+    # query_result = await asyncio.to_thread(
+    #     get_all_zymo_web_products, g
+    # )
+    # query_result = await asyncio.to_thread(
+    #     get_edge_properties_between_nodes, g, "0779772c-2e59-4010-8dd3-3285eedcc4b7", "01HA2M110J99PNNQS2PWAFXRG5", "is_recipient_of"
+    # )
     # query_result = await asyncio.to_thread(
     #     get_publications_by_product, g, "qiagen rneasy mini kit"
     # )
@@ -131,7 +138,7 @@ async def app_startup():
 
     # DROP NODES/EDGES BY LABEL:
     # await asyncio.to_thread(
-    #     drop_nodes, g, 'marketing_campaign'
+    #     drop_nodes, g, 'zymo_product'
     # )
     # await asyncio.to_thread(
     #     drop_edges, g, 'is_recipient_of'
@@ -144,9 +151,9 @@ async def app_startup():
     # )
 
     # TESTING:
-    # node_count = await asyncio.to_thread(
-    #     count_nodes_in_db, g, 'marketing_campaign'
-    # )
+    node_count = await asyncio.to_thread(
+        count_nodes_in_db, g, 'cohort'
+    )
     # edge_count = await asyncio.to_thread(
     #     count_edges_in_db, g, 'relates to'
     # )
@@ -157,7 +164,7 @@ async def app_startup():
     #     count_edges_in_db, g, 'is_recipient_of'
     # )
 
-    specific_node_count = count_specific_nodes_in_db(g, "person", "ingestion_tag", "directzol_PTGenetika_RPLeffect")
+    # specific_node_count = count_specific_nodes_in_db(g, "person", "ingestion_tag", "directzol_PTGenetika_RPLeffect")
 
     # people_by_lead_scores_count = count_people_by_keyword(g, "Lead Scores")
 
@@ -167,12 +174,18 @@ async def app_startup():
 
     # all_keywords = get_all_keywords(g)
 
-    node_properties = await asyncio.to_thread(
-        check_node_properties, g, 'person', 'email', 'z.z@duke.edu'
-    )
+    # node_properties = await asyncio.to_thread(
+    #     check_node_properties, g, 'person', 'email', 'z.z@duke.edu'
+    # )
+    # node_properties = await asyncio.to_thread(
+    #     check_node_properties, g, 'zymo_web_product', 'uuid', 'D3062-1'
+    # )
     # node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'organization', 'display_name', 'SML Genetree Co. Ltd'
     # )
+    node_properties = await asyncio.to_thread(
+        check_node_properties, g, 'cohort', 'data_source', 'testing'
+    )
     # node_properties = await asyncio.to_thread(
     #     check_node_properties, g, 'keyword', 'name', "miRNA"
     # )
@@ -186,14 +199,14 @@ async def app_startup():
     #     check_node_properties, g, 'publication_product', 'name', 'qiagen rneasy mini kit'
     # )
     # print(all_keywords)
-    print('\nQUERY RESULT:', query_result)
-    # print('NODE COUNT:', node_count)
+    # print('\nQUERY RESULT:', query_result)
+    print('NODE COUNT:', node_count)
     # print('\nEDGE COUNT:', edge_count)
     # print('LEAD SCORES PEOPLE COUNT:', people_by_lead_scores_count)
     # print('\nSPECIFIC EDGE COUNT:', specific_edge_count)
     # print('\nSPECIFIC NODE COUNT:', specific_node_count)
     # print('NAME LIST:', name_list)
-    # print('\nNODE PROPERTIES:', node_properties)
+    print('\nNODE PROPERTIES:', node_properties)
     # print('\nMARKETING CAMPAIGN NODE PROPERTIES:', marketing_campaign_node_properties)
     # print('NODE PROPERTIES:', publication_product_node_properties)
 

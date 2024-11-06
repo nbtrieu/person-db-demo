@@ -33,7 +33,8 @@ from data_objects import (
     Person,
     Organization,
     Keyword,
-    ZymoProduct,
+    ZymoNetsuiteProduct,
+    ZymoWebProduct,
     Publication,
     PublicationProduct,
     MarketingCampaign
@@ -142,6 +143,15 @@ def check_node_properties(g: GraphTraversalSource, label: str, property_key: str
     )
     return properties
 
+def add_cohort_users(g: GraphTraversalSource):
+    new_cohort = g.addV('cohort').property('data_source', 'testing').property('ingestion_tag', 'testing').next()
+
+    g.addV('user').property('name', 'Nicole').next()
+    g.addV('user').property('name', 'Kyle').next()
+    g.addV('user').property('name', 'Lam').next()
+    g.addV('user').property('name', 'Thien').next()
+
+    g.V().hasLabel('user').addE('belongs_to').to(__.V(new_cohort.id)).iterate()
 
 def add_people(g: GraphTraversalSource, contact_df: pd.DataFrame):
     query_executor = BulkQueryExecutor(g, 100)
@@ -258,41 +268,102 @@ def add_keywords(g: GraphTraversalSource, unique_keywords_df: pd.DataFrame):
 
     query_executor.force_execute()
 
-def add_zymo_products(g: GraphTraversalSource, zymo_products_df: pd.DataFrame):
+def add_zymo_netsuite_products(g: GraphTraversalSource, zymo_netsuite_products_df: pd.DataFrame):
     query_executor = BulkQueryExecutor(g, 100)
 
     for index, row in tqdm(
-        zymo_products_df.iterrows(),
-        total=zymo_products_df.shape[0],
-        desc="Importing Zymo Products:"
+        zymo_netsuite_products_df.iterrows(),
+        total=zymo_netsuite_products_df.shape[0],
+        desc="Importing Zymo Netsuite Products:"
     ):
         product_properties = {
-            ZymoProduct.PropertyKey.UUID: row.get("Item name/SKU#"),
-            ZymoProduct.PropertyKey.NAME: row.get("Item name/SKU#"),
-            ZymoProduct.PropertyKey.CATEGORY: row.get("Product Category"),
-            ZymoProduct.PropertyKey.PRODUCT_CLASS: row.get("Class (no hierarchy)"),
-            ZymoProduct.PropertyKey.ITEM_TYPE: row.get("Type"),
-            ZymoProduct.PropertyKey.DESCRIPTION: row.get("Description"),
-            ZymoProduct.PropertyKey.SHORT_DESCRIPTION: row.get("Short Description"),
-            ZymoProduct.PropertyKey.BASE_PRICE: row.get("Base Price"),
-            ZymoProduct.PropertyKey.SKU: row.get("Item name/SKU#"),
-            ZymoProduct.PropertyKey.INACTIVE: row.get("Inactive"),
-            ZymoProduct.PropertyKey.SHELF_LIFE: row.get("Shelf Life (Months)"),
-            ZymoProduct.PropertyKey.STORAGE_TEMPERATURE: row.get("Storage Temperature"),
-            ZymoProduct.PropertyKey.SHIPPING_TEMPERATURE: row.get("Shipping Temperature"),
-            ZymoProduct.PropertyKey.FEATURES: row.get("Features"),
-            ZymoProduct.PropertyKey.LENGTH: row.get("Length"),
-            ZymoProduct.PropertyKey.WIDTH: row.get("Width"),
-            ZymoProduct.PropertyKey.HEIGHT: row.get("Height"),
-            ZymoProduct.PropertyKey.WEIGHT: row.get("Weight"),
-            ZymoProduct.PropertyKey.AVAILABLE_STOCK: row.get("Available"),
-            ZymoProduct.PropertyKey.SAFETY_INFORMATION: row.get("Safety Data Sheet/ MSDS URL"),
-            ZymoProduct.PropertyKey.PRODUCT_URL: row.get("Product URL"),
-            ZymoProduct.PropertyKey.IMAGE_URL: row.get("Link for Main image of item")
+            ZymoNetsuiteProduct.PropertyKey.UUID: row.get("Item name/SKU#"),
+            ZymoNetsuiteProduct.PropertyKey.NAME: row.get("Item name/SKU#"),
+            ZymoNetsuiteProduct.PropertyKey.CATEGORY: row.get("Product Category"),
+            ZymoNetsuiteProduct.PropertyKey.PRODUCT_CLASS: row.get("Class (no hierarchy)"),
+            ZymoNetsuiteProduct.PropertyKey.ITEM_TYPE: row.get("Type"),
+            ZymoNetsuiteProduct.PropertyKey.DESCRIPTION: row.get("Description"),
+            ZymoNetsuiteProduct.PropertyKey.SHORT_DESCRIPTION: row.get("Short Description"),
+            ZymoNetsuiteProduct.PropertyKey.BASE_PRICE: row.get("Base Price"),
+            ZymoNetsuiteProduct.PropertyKey.SKU: row.get("Item name/SKU#"),
+            ZymoNetsuiteProduct.PropertyKey.INACTIVE: row.get("Inactive"),
+            ZymoNetsuiteProduct.PropertyKey.SHELF_LIFE: row.get("Shelf Life (Months)"),
+            ZymoNetsuiteProduct.PropertyKey.STORAGE_TEMPERATURE: row.get("Storage Temperature"),
+            ZymoNetsuiteProduct.PropertyKey.SHIPPING_TEMPERATURE: row.get("Shipping Temperature"),
+            ZymoNetsuiteProduct.PropertyKey.FEATURES: row.get("Features"),
+            ZymoNetsuiteProduct.PropertyKey.LENGTH: row.get("Length"),
+            ZymoNetsuiteProduct.PropertyKey.WIDTH: row.get("Width"),
+            ZymoNetsuiteProduct.PropertyKey.HEIGHT: row.get("Height"),
+            ZymoNetsuiteProduct.PropertyKey.WEIGHT: row.get("Weight"),
+            ZymoNetsuiteProduct.PropertyKey.AVAILABLE_STOCK: row.get("Available"),
+            ZymoNetsuiteProduct.PropertyKey.SAFETY_INFORMATION: row.get("Safety Data Sheet/ MSDS URL"),
+            ZymoNetsuiteProduct.PropertyKey.PRODUCT_URL: row.get("Product URL"),
+            ZymoNetsuiteProduct.PropertyKey.IMAGE_URL: row.get("Link for Main image of item")
         }
 
         query_executor.add_vertex(
-            label=ZymoProduct.LABEL,
+            label=ZymoNetsuiteProduct.LABEL,
+            properties=product_properties
+        )
+
+    query_executor.force_execute()
+
+def add_zymo_web_products(g: GraphTraversalSource, zymo_web_products_df: pd.DataFrame):
+    query_executor = BulkQueryExecutor(g, 100)
+
+    for index, row in tqdm(
+        zymo_web_products_df.iterrows(),
+        total=zymo_web_products_df.shape[0],
+        desc="Importing Zymo Web Products:"
+    ):
+        product_properties = {
+            ZymoWebProduct.PropertyKey.UUID: row.get("SKU"),
+            ZymoWebProduct.PropertyKey.SKU: row.get("SKU"),
+            ZymoWebProduct.PropertyKey.SHOPIFY_ID: str(row.get("Shopify ID")),  # Cast to string
+            ZymoWebProduct.PropertyKey.HANDLE: row.get("Handle"),
+            ZymoWebProduct.PropertyKey.COMMAND: row.get("Command"),
+            ZymoWebProduct.PropertyKey.TITLE: row.get("Title"),
+            ZymoWebProduct.PropertyKey.BODY_HTML: row.get("Body HTML"),
+            ZymoWebProduct.PropertyKey.VENDOR: row.get("Vendor"),
+            ZymoWebProduct.PropertyKey.TYPE: row.get("Type"),
+            ZymoWebProduct.PropertyKey.TAGS: row.get("Tags"),
+            ZymoWebProduct.PropertyKey.STATUS: row.get("Status"),
+            ZymoWebProduct.PropertyKey.URL: row.get("URL"),
+            ZymoWebProduct.PropertyKey.TOTAL_INVENTORY_QTY: int(row.get("Total Inventory Qty", 0)),
+            ZymoWebProduct.PropertyKey.CATEGORY_ID: row.get("Category: ID"),
+            ZymoWebProduct.PropertyKey.CATEGORY_NAME: row.get("Category: Name"),
+            ZymoWebProduct.PropertyKey.CATEGORY: row.get("Category"),
+            ZymoWebProduct.PropertyKey.CUSTOM_COLLECTIONS: row.get("Custom Collections"),
+            ZymoWebProduct.PropertyKey.SMART_COLLECTIONS: row.get("Smart Collections"),
+            ZymoWebProduct.PropertyKey.IMAGE_TYPE: row.get("Image Type"),
+            ZymoWebProduct.PropertyKey.IMAGE_SRC: row.get("Image Src"),
+            ZymoWebProduct.PropertyKey.IMAGE_COMMAND: row.get("Image Command"),
+            ZymoWebProduct.PropertyKey.IMAGE_POSITION: row.get("Image Position"),
+            ZymoWebProduct.PropertyKey.IMAGE_WIDTH: row.get("Image Width"),
+            ZymoWebProduct.PropertyKey.IMAGE_HEIGHT: row.get("Image Height"),
+            ZymoWebProduct.PropertyKey.IMAGE_ALT_TEXT: row.get("Image Alt Text"),
+            ZymoWebProduct.PropertyKey.VARIANT_ID: str(row.get("Variant ID")),  # Cast to string
+            ZymoWebProduct.PropertyKey.OPTION1_NAME: row.get("Option1 Name"),
+            ZymoWebProduct.PropertyKey.OPTION1_VALUE: row.get("Option1 Value"),
+            ZymoWebProduct.PropertyKey.OPTION2_NAME: row.get("Option2 Name"),
+            ZymoWebProduct.PropertyKey.OPTION2_VALUE: row.get("Option2 Value"),
+            ZymoWebProduct.PropertyKey.VARIANT_POSITION: row.get("Variant Position"),
+            ZymoWebProduct.PropertyKey.VARIANT_PRICE: row.get("Variant Price"),
+            ZymoWebProduct.PropertyKey.METAFIELD_TITLE_TAG: row.get("Metafield: title_tag [string]"),
+            ZymoWebProduct.PropertyKey.METAFIELD_CUSTOM_PRODUCT: row.get("Metafield: mm-google-shopping.custom_product [boolean]"),
+            ZymoWebProduct.PropertyKey.METAFIELD_HIGHLIGHT_A: row.get("Metafield: highlight.highlight-a [string]"),
+            ZymoWebProduct.PropertyKey.METAFIELD_HIGHLIGHT_B: row.get("Metafield: highlight.highlight-b [string]"),
+            ZymoWebProduct.PropertyKey.METAFIELD_HIGHLIGHT_C: row.get("Metafield: highlight.highlight-c [string]"),
+            ZymoWebProduct.PropertyKey.METAFIELD_SHORT_DESCRIPTION: row.get("Metafield: highlight.short-description [string]"),
+            ZymoWebProduct.PropertyKey.METAFIELD_GOOGLE_PRODUCT_CATEGORY: row.get("Metafield: mm-google-shopping.google_product_category [string]"),
+            ZymoWebProduct.PropertyKey.METAFIELD_CUSTOM_LABEL_0: row.get("Metafield: mm-google-shopping.custom_label_0 [string]"),
+            ZymoWebProduct.PropertyKey.METAFIELD_SUGGESTED_TERMS: row.get("Metafield: seo-search.suggestedTerms [string]"),
+            ZymoWebProduct.PropertyKey.METAFIELD_SDS_URL: row.get("Metafield: attachments.SDS (MSDS) [string]"),
+            ZymoWebProduct.PropertyKey.METAFIELD_SEARCH_TAG: row.get("Metafield: search_tag [string]")
+        }
+
+        query_executor.add_vertex(
+            label=ZymoWebProduct.LABEL,
             properties=product_properties
         )
 
@@ -612,6 +683,15 @@ def get_edge_properties_between_nodes(
     )
     print(f"Edge properties between {source_uuid} and {target_uuid}: {edge_properties}")
     return edge_properties
+
+def get_all_zymo_web_products(g: GraphTraversalSource):
+    return (
+        g.V()
+        .hasLabel("zymo_web_product")
+        .valueMap()
+        .dedup()
+        .toList()
+    )
 
 #  SEARCH ALL NODES BY KEYWORD:
 def get_people_by_keyword(g: GraphTraversalSource, keyword: str):

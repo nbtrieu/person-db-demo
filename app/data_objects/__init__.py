@@ -4,6 +4,7 @@ from .keyword import Keyword
 from .publication import Publication
 from .project import Project
 from .event import Event
-from .zymo_product import ZymoProduct
+from .zymo_netsuite_product import ZymoNetsuiteProduct
+from .zymo_web_product import ZymoWebProduct
 from .publication_product import PublicationProduct
 from .marketing_campaign import MarketingCampaign
